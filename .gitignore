@@ -1,0 +1,11 @@
+__pycache__/
+.ipynb_checkpoints/
+.env
+.DS_Store
+
+# big artifacts (do not commit)
+data/
+adapters/
+rag/**/chroma_store/
+*.safetensors
+*.bin
