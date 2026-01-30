@@ -3,7 +3,7 @@ __pycache__/
 .env
 .DS_Store
 
-# big artifacts (do not commit)
+# big artifacts
 data/
 adapters/
 rag/**/chroma_store/
