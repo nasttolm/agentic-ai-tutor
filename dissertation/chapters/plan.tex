@@ -1,0 +1,451 @@
+\chapter{Implementation}
+\label{chap:implementation}
+
+\section{Overview}
+This chapter describes how the Agentic AI Tutor was implemented following the MLOps lifecycle. It explains how each stage of the pipeline was carried out in practice.
+
+The development of the Agentic AI Tutor is organised into six main stages that follow the MLOps lifecycle:
+\begin{itemize}
+    \item Data collection and processing
+    \item Model development and training
+    \item Model evaluation and testing
+    \item Model deployment
+    \item Monitoring and maintenance
+    \item Lifecycle management
+\end{itemize}
+
+\section{Data collection and processing}
+\subsection{Data collection}
+The Agentic AI Tutor focuses on three modules:
+
+\begin{itemize}
+    \item \textbf{Fundamentals of Software Development (FSD)},
+    \item \textbf{Fundamentals of Computer Science (FCS)},
+    \item \textbf{Discrete Mathematics (DMA)}.
+\end{itemize}
+
+The Agentic AI Tutor targets three academic modules: Fundamentals of Software Development (FSD),
+Fundamentals of Computer Science (FCS), and Discrete Mathematics (DMA). In this project, the full data processing, training, and evaluation pipeline was implemented and applied consistently to all three subjects. Each subject was processed independently using the same subject-agnostic pipeline, resulting in separate datasets, fine-tuned models, and evaluation results for FSD, FCS, and DMA.
+
+\paragraph{Sources of teaching materials.}
+All teaching materials were downloaded from the official university Moodle platform.
+For FSD, the 2022/23 Moodle course was used.
+
+\begin{itemize}
+    \item Fundamentals of Software Development (CSI\_4\_FSD\_2223)
+\end{itemize}
+
+The FSD course for 2024/25 is not visible to students on Moodle, and the 2025/26 course does not yet contain a full set of lecture and tutorial resources. The 2022/23 course was therefore chosen because it provides a complete set of materials for the whole module.
+
+For FCS and DMA, the raw resources were downloaded from the 2024/25 Moodle courses:
+
+\begin{itemize}
+    \item Fundamentals of Computer Science (CSI\_4\_FCS\_2425)
+    \item Discrete Mathematics (CSI\_4\_DMA\_2425)
+\end{itemize}
+
+\paragraph{Directory structure and file formats.}
+All teaching resources are stored in a data/ directory in the project repository. Each subject has its own subdirectory with a raw/ folder that contains the original files as downloaded from Moodle:
+
+\begin{verbatim}
+data/
+  fsd/
+    raw/
+  fcs/
+    raw/
+  dma/
+    raw/
+\end{verbatim}
+
+This structure makes it easy to reproduce the experiments. Any script that needs the materials can read all files in data/<subject>/raw/.
+
+For FSD, all files are in PDF format. The fsd/raw directory contains lecture slide decks, tutorial sheets, mixed learning session slides, one project handout, and tutorial solution documents.
+
+For FCS and DMA, the raw directories contain a mix of PPTX slide decks, DOC/DOCX tutorial sheets and solutions, and several supporting PDFs (for example, short chapters or summary notes).
+
+The data loading code used later in the project can read PDF, PPTX, DOC, DOCX, TXT and Markdown (MD) files. This means that all teaching materials from Moodle can be processed by the same pipeline.
+
+\paragraph{Coverage of the modules.}
+
+Table\ref{tab:data-summary} summarises the collected teaching materials for all three subjects.
+
+\begin{table}[h]
+    \centering
+    \caption{Summary of collected teaching materials per subject
+             (raw files in \texttt{data/<subject>/raw/}).}
+    \label{tab:data-summary}
+    \resizebox{\textwidth}{!}{
+    \begin{tabular}{lccccc}
+        \hline
+        Subject & Source Moodle course & Lecture decks & Extra docs & Tutorial sheets & Tutorial solutions \\
+        \hline
+        FSD & CSI\_4\_FSD\_2223 & 10 & 5 & 9 & 7 \\
+        FCS & CSI\_4\_FCS\_2425 & 10 & 3 & 10 & 11 \\
+        DMA & CSI\_4\_DMA\_2425 & 10 & 0 & 10 & 5 \\
+        \hline
+    \end{tabular}
+    }
+\end{table}
+
+\subsection{Data exploration}
+Before any downstream steps, an exploratory analysis of the teaching materials for the three target modules (FSD, FCS and DMA) was carried out. To make automatic grouping possible, all files were manually renamed so that the filename starts with a topic prefix in the form Topic\_XX. This makes it possible to group files by topic in an automated way.
+
+\paragraph{Building topic-level documents.}
+In the pipeline, the main unit is a topic document. For each subject, all files that share the same Topic\_XX prefix are grouped together. Text is extracted from each file (PDF, PPTX, DOC/DOCX), and all extracted text within the same topic is concatenated into one topic-level document (for example, FSD\_Topic\_03).
+
+\paragraph{Corpus size and basic statistics.}
+Table \ref{tab:corpus-stats} reports the statistics at topic-document level. For FSD, the dataset contains 16 topic documents built from 31 PDF files, with a total of 24,318 words. Topic lengths range from 126 to 3,359 words (median 1,343 and standard deviation 943.5). The short minimum value means that some topics have limited extractable text (for example, slides with mainly images).
+
+For FCS, the dataset contains 10 topic documents built from 32 raw files (mainly PPTX and DOCX), with a total of 41,073 words. Topic lengths range from 1,851 to 8,291 words (median 3,830.5 and standard deviation 1,807.9), which means that most topics contain a substantial amount of text.
+
+For DMA, the dataset contains 10 topic documents built from 25 raw files (PDF, DOCX and one PPTX), with a total of 37,043 words. Topic lengths range from 908 to 7,960 words (median 3,016.5 and standard deviation 2,725.7), which reflects a mix of shorter notes and longer tutorial-style documents.
+
+\begin{table}[h]
+    \centering
+    \caption{Overview of the teaching corpora at topic-document level.}
+    \label{tab:corpus-stats}
+    \small
+    \setlength{\tabcolsep}{4pt}
+    \begin{tabular}{lrrrrrrr}
+        \toprule
+        Module & Topics & Words & Mean & Median & Min & Max & Std dev \\
+        \midrule
+        FSD & 16 & 24,318 & 1,519.9 & 1,343.0 & 126 & 3,359 & 943.5 \\
+        FCS & 10 & 41,073 & 4,107.3 & 3,830.5 & 1,851 & 8,291 & 1,807.9 \\
+        DMA & 10 & 37,043 & 3,704.3 & 3,016.5 & 908 & 7,960 & 2,725.7 \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+\FloatBarrier
+
+
+\paragraph{Distribution of page lengths.}
+Figures \ref{fig:fsd-topic-lengths}, \ref{fig:fcs-topic-lengths} and \ref{fig:dma-topic-lengths} show the distributions of topic lengths (words per topic document). Since each corpus contains only 10-16 topic documents, the histograms are sparse. However, they still show the overall size of each module and the presence of short and long topics. In particular, FCS and DMA contain several large topics, while FSD contains a few unusually short topics that may require further inspection.
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=\textwidth]{figs/FSD_length_distribution.png}
+    \caption{Distribution of topic lengths in the FSD corpus (words per topic document).}
+    \label{fig:fsd-topic-lengths}
+\end{figure}
+\FloatBarrier
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=\textwidth]{figs/FCS_length_distribution.png}
+    \caption{Distribution of topic lengths in the FCS corpus (words per topic document).}
+    \label{fig:fcs-topic-lengths}
+\end{figure}
+\FloatBarrier
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=\textwidth]{figs/DMA_length_distribution.png}
+    \caption{Distribution of topic lengths in the DMA corpus (words per topic document).}
+    \label{fig:dma-topic-lengths}
+\end{figure}
+\FloatBarrier
+
+\paragraph{Vocabulary and main topics.}
+The vocabulary of each corpus was analysed using the same preprocessing pipeline. Text is converted to lowercase and URL/email patterns are removed. Tokenisation keeps only alphabetic tokens with a minimum length of two characters. Common English stop words and a small set of domain-specific stop words are removed. Finally, the remaining tokens are lemmatised.
+
+Based on these tokens, a word cloud and a bar chart of the 20 most frequent content words were generated for each module (Figures \ref{fig:fsd-wordcloud}-\ref{fig:dma-topwords}). In addition, frequent bigrams and trigrams were computed to highlight repeated multi-word phrases in the materials (Figures \ref{fig:fsd-bigrams}-\ref{fig:dma-trigrams}).
+
+For FSD, frequent content words include statement, printf, loop, program, variable, value and function. Frequent bigrams and trigrams like "include stdio", "stdio int main", and "task write program" show repeated code patterns and repeated task instructions. Overall, the results confirm that the FSD materials focus on basic programming syntax, control flow and code examples.
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=\textwidth]{figs/FSD_wordcloud.png}
+    \caption{Word cloud for the top content words in the FSD teaching materials.}
+    \label{fig:fsd-wordcloud}
+\end{figure}
+\FloatBarrier
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=\textwidth]{figs/FSD_top_words.png}
+    \caption{Top 20 content words in the FSD corpus with their frequencies.}
+    \label{fig:fsd-topwords}
+\end{figure}
+\FloatBarrier
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=\textwidth]{figs/FSD_top_bigrams.png}
+    \caption{Top 20 bigrams in the FSD corpus.}
+    \label{fig:fsd-bigrams}
+\end{figure}
+\FloatBarrier
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=\textwidth]{figs/FSD_top_trigrams.png}
+    \caption{Top 20 trigrams in the FSD corpus.}
+    \label{fig:fsd-trigrams}
+\end{figure}
+\FloatBarrier
+
+For FCS, the top content words such as data, bit, number, memory, cpu, binary and instruction reflect the focus on data representation and computer architecture. At the n-gram level, the results contain both meaningful technical phrases like "binary number" and "memory location" and repeated institutional headers like "csi fcs". This suggests that removing headers and footers could further improve the quality of the text.
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=\textwidth]{figs/FCS_wordcloud.png}
+    \caption{Word cloud for the top content words in the FCS teaching materials.}
+    \label{fig:fcs-wordcloud}
+\end{figure}
+\FloatBarrier
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=\textwidth]{figs/FCS_top_words.png}
+    \caption{Top 20 content words in the FCS corpus with their frequencies.}
+    \label{fig:fcs-topwords}
+\end{figure}
+\FloatBarrier
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=\textwidth]{figs/FCS_top_bigrams.png}
+    \caption{Top 20 bigrams in the FCS corpus.}
+    \label{fig:fcs-bigrams}
+\end{figure}
+\FloatBarrier
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=\textwidth]{figs/FCS_top_trigrams.png}
+    \caption{Top 20 trigrams in the FCS corpus.}
+    \label{fig:fcs-trigrams}
+\end{figure}
+\FloatBarrier
+
+For DMA, frequent words such as set, graph, vertex, edge, proposition, predicate and truth match the main topics of the module: set theory, logic and graph theory. However, frequent n-grams also include tutorial artefacts like "exercise page". These patterns describe the nature of the teaching materials, but may need extra cleaning if the goal is to focus only on conceptual content.
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=\textwidth]{figs/DMA_wordcloud.png}
+    \caption{Word cloud for the top content words in the DMA teaching materials.}
+    \label{fig:dma-wordcloud}
+\end{figure}
+\FloatBarrier
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=\textwidth]{figs/DMA_top_words.png}
+    \caption{Top 20 content words in the DMA corpus with their frequencies.}
+    \label{fig:dma-topwords}
+\end{figure}
+\FloatBarrier
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=\textwidth]{figs/DMA_top_bigrams.png}
+    \caption{Top 20 bigrams in the DMA corpus.}
+    \label{fig:dma-bigrams}
+\end{figure}
+\FloatBarrier
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=\textwidth]{figs/DMA_top_trigrams.png}
+    \caption{Top 20 trigrams in the DMA corpus.}
+    \label{fig:dma-trigrams}
+\end{figure}
+\FloatBarrier
+
+\paragraph{Normalising input into topic texts.}
+All subject materials (PDF slides, PPTX lecture decks, and Word-based tutorials) were first consolidated into a unified intermediate representation stored as a topics.pkl file. Each entry is indexed by (subject, topic\_id) and contains the extracted text (full\_text) together with lightweight provenance metadata (a list of source\_files). This normalisation enables the same QA generation pipeline to be reused across subjects without relying on format-specific logic.
+
+\subsection{Data preparation and preprocessing}
+
+The teaching materials were transformed into a question-answer dataset suitable for training a small language model as an AI tutor. While the pipeline itself is subject-agnostic, model fine-tuning was performed separately for each subject. Three independent LoRA adapters were trained, one per subject, each using only the training data from its corresponding module.
+
+\paragraph{Token-based chunking of long topics.}
+Topic texts vary substantially in length. Tutorial sheets and consolidated notes can exceed the practical prompt budget for a small model. Therefore, each topic was split into overlapping chunks using the model tokenizer, with a target size of 1200 tokens and an overlap of 120 tokens. Chunks were limited to 1200 tokens to keep the full prompt (instructions + context) and the generated answer within the model’s 4096 token context window, while avoiding aggressive truncation and preserving space for multi-sentence tutor-style explanations. Chunking is performed on paragraph boundaries when possible, and oversized paragraphs are further split by sentence boundaries to avoid extremely long single segments. This step ensures that the model receives coherent context while leaving sufficient generation budget for explanatory answers.
+
+\paragraph{Tutor-oriented QA generation.}
+Question–answer pairs were generated using the microsoft/Phi-3-mini-4k-instruct model. The prompt was designed for a tutoring setting: answers are expected to be explanatory (not one-line definitions), typically spanning multiple sentences and focusing on understanding rather than rote memorisation. To increase coverage, the pipeline generates multiple question types per chunk using universal modes: core concepts, definitions and terms, application and reasoning, compare/contrast, and common mistakes. Since Phi-3-mini supports a 4k context window, the generation prompts were designed to fit within this budget (instructions + chunk context + answer). The target number of questions per chunk is chosen heuristically based on chunk length (4 for chunks under 300 tokens, 8 for 300-699 tokens, and 12 for chunks of over 700 tokens).
+
+For each subject, the generated QA dataset was first split into training and evaluation subsets.
+This split was performed before any automated or manual quality review to prevent information leakage between training and evaluation data. All subsequent processing steps, including GPT-based quality review and manual inspection, were applied independently to the training and evaluation splits.
+
+\paragraph{Quality filtering.}
+Because the target model is trained as an AI tutor, the dataset prioritises explanatory answers rather than one-line definitions. After generation, each candidate QA object is validated and filtered in several stages:
+
+\begin{enumerate}
+    \item \textbf{JSON validation and repair.} The model is instructed to output only a JSON array. The pipeline attempts strict JSON parsing. If parsing fails, it issues one repair prompt requesting JSON-only output. Outputs that remain unparsable after the retry are logged in qa\_errors\_<subject>.csv.
+    \item 
+    \item \textbf{Answer and question length filters.} Only QA pairs passing a deterministic quality function are retained. In particular, questions must contain at least 4 words and answers must contain at least 20 words to enforce tutor-style explanations.
+    \item 
+    \item \textbf{Deduplication.} To reduce redundancy within each subject, questions are normalised (lowercasing, whitespace normalisation, and punctuation removal) and normalised exact duplicates are removed. In the final datasets, the number of duplicate questions after normalisation is 0 for FSD, FCS and DMA.
+    \item \textbf{Semi-automated quality review.} All generated QA pairs were reviewed using an automated GPT-based reviewer, which assigned each pair a label (OK or FLAGGED) together with optional reasons. To validate the reliability of this filtering step, random samples from both the OK and FLAGGED subsets were manually inspected. This inspection confirmed that the automated review reliably retained high-quality tutor-style explanations while filtering out low-quality or unsuitable examples.
+    \item
+\end{enumerate}
+
+\paragraph{Evaluation subset used for metrics.}
+For final metric reporting, only the evaluation subset labelled \texttt{OK} (saved as \texttt{<subject>\_eval\_OK.jsonl}) was used. This ensures that all reported scores are computed on high-quality tutor-style QA pairs and remain strictly held out from training.
+
+\paragraph{Resulting QA datasets.}
+The final datasets are stored as JSONL files (one QA pair per line) including metadata fields such as subject, topic\_id, chunk\_id, mode, and source\_files. The resulting dataset sizes are:
+\begin{itemize}
+    \item \textbf{FSD:} 680 QA pairs from 16 topics and 60 chunks (59 chunks used at least once), covering 31 source files.
+    \item \textbf{FCS:} 745 QA pairs from 10 topics and 73 chunks (69 chunks used at least once), covering 32 source files.
+    \item \textbf{DMA:} 708 QA pairs from 10 topics and 74 chunks (72 chunks used at least once), covering 25 source files.
+\end{itemize}
+
+\paragraph{Conversion to conversational fine-tuning format.}
+For LoRA fine-tuning with Unsloth, the simple QA pairs are converted into a conversational format. A separate script reads the flat JSONL file with question-answer pairs and wraps each pair into a short conversation: a system message defining the tutor role for the subject, followed by the student question (user message) and the tutor answer (assistant message).
+
+\section{Model development and training}
+Although Phi-3-mini-4k-instruct was used for synthetic QA generation, model fine-tuning and evaluation were performed using microsoft/Phi-4-mini-instruct as the base model, with one LoRA adapter trained per subject (FSD, FCS, DMA). This keeps the training/evaluation stack consistent with the final inference setup used for metric reporting.
+
+
+Model adaptation was performed separately for each subject. Starting from the same instruction-tuned
+base model, three independent LoRA fine-tuning runs were executed, resulting in subject-specific
+adapters for FSD, FCS, and DMA. This design choice allows each model to specialise in the terminology, problem types, and explanatory style of its corresponding module, while preserving a consistent training and evaluation methodology across subjects.
+
+The goal of the Agentic AI Tutor is to adapt an existing instruction-tuned model to a specific academic tutoring domain. Low-Rank Adaptation (LoRA) was selected as the main fine-tuning method. The implementation follows best practices described in the Unsloth documentation \parencite{LoRAfine55:online} and uses the Unsloth training framework and example notebooks \parencite{GitHubun10:online} as a reference for stable and efficient fine-tuning.
+
+\subsection{LoRA configuration}
+
+The LoRA configuration was chosen based on recommendations from the Unsloth hyperparameter guide \parencite{LoRAfine55:online} and preliminary experiments. The following key settings were used:
+
+\begin{itemize}
+    \item \textbf{LoRA rank ($r=16$).} This value provides sufficient capacity for domain adaptation while keeping the number of trainable parameters low.
+    \item \textbf{LoRA scaling factor ($\alpha=16$).} Setting $\alpha$ equal to the rank follows a commonly recommended heuristic and results in stable training behaviour.
+    \item \textbf{Target modules.} LoRA adapters were applied to all major linear layers in both the attention and feed-forward blocks (query, key, value, output, and MLP projections). This ensures that the model can adapt both its attention patterns and its internal representations.
+    \item \textbf{LoRA dropout ($0.0$).} Dropout was disabled, as the fine-tuning runs are short and the dataset is already filtered for quality.
+    \item \textbf{Bias training.} Bias terms were not trained to reduce unnecessary parameter updates.
+\end{itemize}
+
+Gradient checkpointing provided by Unsloth was enabled to further reduce memory consumption during training.
+
+\subsection{Training setup}
+
+The training configuration was designed to achieve a stable effective batch size while remaining within GPU memory limits. The main parameters are:
+
+\begin{itemize}
+    \item \textbf{Per-device batch size:} 2
+    \item \textbf{Gradient accumulation steps:} 8
+    \item \textbf{Effective batch size:} 16
+    \item \textbf{Learning rate:} $2 \times 10^{-4}$
+    \item \textbf{Weight decay:} 0.01
+    \item \textbf{Warm-up ratio:} 5\%
+    \item \textbf{Number of epochs:} 1
+\end{itemize}
+
+An effective batch size of 16 is recommended in the Unsloth documentation as a good default for stable fine-tuning of instruction-based datasets. Training for a single epoch was chosen to reduce the risk of overfitting, as the dataset consists of synthetic but carefully filtered tutor-style question-answer pairs.
+
+\subsection{Design choice: training without response-only masking}
+
+Some fine-tuning pipelines apply loss masking so that the model is trained only on assistant tokens, ignoring system and user messages. While this technique can be useful for large multi-turn conversational datasets, it was deliberately not used in this project.
+
+During implementation, applying response-only masking caused all training labels to be masked out due to strict token-level matching requirements in the training framework. More importantly, the dataset used in this project consists exclusively of single-turn tutor-style interactions with a clear and consistent structure. In this setting, training on the full input sequence does not introduce significant noise and simplifies the training pipeline.
+
+For these reasons, the final implementation keeps the training code unchanged and performs standard supervised fine-tuning without response-only masking. This decision improves robustness and reproducibility while preserving the intended tutoring behaviour of the model.
+
+\subsection{Training environment}
+
+All fine-tuning experiments were conducted in Google Colab using a free NVIDIA Tesla T4 GPU. The Unsloth framework was used to optimise memory usage and training speed.
+
+The trained model is saved as LoRA adapter weights. This allows the adapters to be reused with the original base model during inference, or merged into a standalone model if required for deployment.
+
+\subsection{Retrieval-Augmented Generation}
+
+In addition to fine-tuning the base model with LoRA adapters, the Agentic AI Tutor supports retrieval-augmented generation (RAG) to ground its answers in the original teaching materials.
+
+The RAG pipeline reuses the same token-based chunks created during the data preparation stage. Instead of treating full lecture or tutorial files as retrieval units, each subject corpus is indexed at the chunk level. This design choice is motivated by a factor that semantic retrieval performs better when embeddings represent short, topically coherent text segments rather than long documents containing multiple concepts.
+
+Each retrieved chunk retains lightweight provenance metadata, including the topic identifier and source file names. This allows the system to trace answers back to specific lecture slides or tutorial documents, which is useful for debugging, evaluation, and future user-facing citation features.
+
+For each subject (FSD, FCS and DMA), all chunks are embedded using a lightweight sentence-transformer model and stored in a persistent vector database (ChromaDB). The RAG component operates independently of fine-tuning.
+
+\section{Model evaluation and testing}
+
+Model quality was evaluated separately for each subject (FSD, FCS, DMA) using the corresponding eval\_OK subset. This evaluation set contains only question-answer pairs that passed the semi-automated GPT-based quality review and subsequent manual spot-checking. The same evaluation protocol and metrics were applied across all subjects to ensure a fair comparison between the three model variants:
+
+\begin{itemize}
+    \item \textbf{BASE}: the instruction-tuned base model without adaptation;
+    \item \textbf{LoRA}: the base model with a subject-specific LoRA adapter;
+    \item \textbf{LoRA+RAG}: the LoRA-adapted model augmented with retrieval of subject materials.
+\end{itemize}
+
+\subsection{Metrics}
+Five automatic metrics were used to quantify output quality and runtime efficiency: BLEU, ROUGE-L, METEOR, and BERTScore (F1) were computed between model answers and the ground-truth tutor answers in the evaluation set. In addition, latency was measured as mean and median inference time per example (seconds) to capture the practical cost of model improvements.
+
+All metrics were computed strictly within each subject (FSD/FCS/DMA), comparing BASE, LoRA, and LoRA+RAG under the same prompt format and evaluation script.
+
+\subsection{Results}
+Tables \ref{tab:metrics-fsd}-\ref{tab:metrics-dma} report the evaluation results for each subject.
+
+\begin{table}[h]
+\centering
+\caption{Evaluation metrics on \texttt{eval\_OK} for FSD.}
+\label{tab:metrics-fsd}
+\small
+\begin{tabular}{lrrrrrr}
+\toprule
+Model & BLEU & ROUGE-L & METEOR & BERTScore F1 & Latency (mean) & Latency (median) \\
+\midrule
+BASE     & 5.306 & 0.129 & 0.287 & 0.841 & 12.415 & 12.425 \\
+LoRA     & 10.069 & 0.195 & 0.266 & 0.874 & 14.980 & 14.984 \\
+LoRA+RAG & 11.756 & 0.215 & 0.269 & 0.872 & 15.346 & 15.312 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[h]
+\centering
+\caption{Evaluation metrics on \texttt{eval\_OK} for FCS.}
+\label{tab:metrics-fcs}
+\small
+\begin{tabular}{lrrrrrr}
+\toprule
+Model & BLEU & ROUGE-L & METEOR & BERTScore F1 & Latency (mean) & Latency (median) \\
+\midrule
+BASE     & 6.525 & 0.133 & 0.295 & 0.847 & 12.485 & 12.471 \\
+LoRA     & 11.701 & 0.204 & 0.238 & 0.875 & 15.051 & 15.055 \\
+LoRA+RAG & 11.613 & 0.214 & 0.257 & 0.871 & 15.407 & 15.359 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[h]
+\centering
+\caption{Evaluation metrics on \texttt{eval\_OK} for DMA.}
+\label{tab:metrics-dma}
+\small
+\begin{tabular}{lrrrrrr}
+\toprule
+Model & BLEU & ROUGE-L & METEOR & BERTScore F1 & Latency (mean) & Latency (median) \\
+\midrule
+BASE     & 5.656 & 0.132 & 0.291 & 0.845 & 12.724 & 12.702 \\
+LoRA     & 9.500 & 0.192 & 0.248 & 0.868 & 15.393 & 15.357 \\
+LoRA+RAG & 10.558 & 0.193 & 0.255 & 0.865 & 15.844 & 15.831 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Analysis}
+Across all three subjects, LoRA fine-tuning provides the largest quality improvement relative to the BASE model. The gains are consistent in lexical overlap (BLEU, ROUGE-L) and in semantic similarity (BERTScore). For example, BLEU approximately doubles in every subject: from 5.306 to 10.069 in FSD, from 6.525 to 11.701 in FCS, and from 5.656 to 9.500 in DMA. Similarly, BERTScore F1 increases from 0.841 to 0.874 in FSD, from 0.847 to 0.875 in FCS, and from 0.845 to 0.868 in DMA. These results indicate that subject-specific LoRA adapters successfully adapt the base model to the terminology and tutoring style of each module.
+
+The effect of RAG) is positive but not strictly monotonic across all metrics. In FSD and DMA, LoRA+RAG further improves BLEU and ROUGE-L compared to LoRA, suggesting that retrieved chunks help the model stay closer to the reference answers. In FCS, LoRA+RAG improves ROUGE-L and partially recovers METEOR (0.238 to 0.257), but slightly reduces BLEU and BERTScore compared to LoRA. This pattern is expected in RAG settings: adding retrieved context can introduce additional details or alternative phrasing. While this may improve grounding and factual alignment with the source materials, it does not always increase lexical overlap with a single reference answer, especially when multiple correct explanations exist.
+
+METEOR decreases from BASE to LoRA in all subjects, which can occur when the adapted model uses more technical and specific vocabulary that differs from the reference wording. LoRA+RAG partially mitigates this effect in FSD, FCS, and DMA, consistent with retrieval providing more shared phrasing or content alignment.
+
+Finally, improvements in answer quality come with a runtime cost. Mean latency increases from approximately 12.4-12.7 seconds (BASE) to 15.0-15.4 seconds (LoRA), and to 15.3-15.8 seconds (LoRA+RAG). This increase is consistent with longer prompts (system role + retrieved context) and potentially longer tutor-style outputs.
+
+\subsection{Conclusion}
+Overall, the evaluation demonstrates that subject-specific LoRA fine-tuning is the main driver of quality improvements for the Agentic AI Tutor across all three modules. RAG provides additional gains, particularly in ROUGE-L and (in two subjects) BLEU, but its impact is not uniform across all metrics due to the sensitivity of overlap-based scores to phrasing variation. The final system therefore offers a clear trade-off: improved tutoring quality at the cost of moderately higher latency, with the strongest and most consistent benefits achieved by LoRA adaptation.
+
+These findings align with recent work on SLM-based orchestration in related domains. Phone et al. \parencite{IBN1113} evaluated LoRA-tuned TinyLlama-1.1B against GPT-5-nano and Mistral-Small-24B for intent-based networking tasks using the same metrics (BLEU, METEOR, ROUGE-L). Their results similarly show that domain-adapted SLMs achieve comparable or superior accuracy to larger LLMs while reducing inference time by approximately 20\%. This supports the broader conclusion that lightweight, fine-tuned SLMs represent an efficient alternative to general-purpose LLMs for specialised applications.
+
+\section{Model deployment}
+
+\section{Monitoring and maintenance}
+
+\section{Lifecycle management}
+
+
+\section{Reflection on the Progress}
+

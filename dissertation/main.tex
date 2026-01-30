@@ -1,0 +1,67 @@
+\documentclass[12pt,a4paper]{report}
+
+% --------- Packages ----------
+\usepackage{graphicx}
+\usepackage{pgfgantt}
+\usepackage{pdfpages}
+\usepackage{tikz}
+\usepackage{pdflscape}
+\usepackage{adjustbox}
+\usepackage{placeins}
+\usepackage{booktabs}
+\usepackage{microtype}
+\usepackage{parskip}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage[toc,page]{appendix}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[hidelinks]{hyperref}
+\usepackage{tabularx,makecell,array,booktabs,xurl}
+\usepackage{url}
+\def\UrlBreaks{\do\/\do-\do\_\do\.\do\&\do\=\do\?\do\#}
+\Urlmuskip=0mu plus 2mu\relax
+\emergencystretch=2em
+\lstset{
+  basicstyle=\ttfamily\small,
+  breaklines=true,
+  numbers=left,
+  numberstyle=\tiny,
+  frame=single
+}
+
+
+% --------- BibLaTeX (Mendeley) ----------
+\usepackage[backend=biber,style=authoryear]{biblatex}
+\addbibresource{references.bib}
+
+
+% --------- Title page ----------
+\setlength{\parindent}{0pt}
+\begin{document}
+\begin{titlepage}
+    \centering
+    {\Large London South Bank University}\\[1.2cm]
+    {\large School of Engineering}\\[2.0cm]
+    {\LARGE \textbf{Building a Scalable Agentic AI Tutor Using MLOps Practices}}\\[0.4cm]
+    {Author: Anastasia Tolmacheva}\\[0.4cm]
+    {Supervisor: Brahim El Boudani}\\[3cm]
+    {\large \today}
+\end{titlepage}
+
+\tableofcontents
+\clearpage
+
+% --------- Chapters ----------
+\input{chapters/intro}
+\input{chapters/lit_review}
+\input{chapters/tech_review}
+\input{chapters/methodology}
+\input{chapters/plan}
+\input{chapters/appendix}
+
+% --------- References ----------
+\clearpage
+\printbibliography
+
+\end{document}
