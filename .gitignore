@@ -2,6 +2,8 @@ __pycache__/
 .ipynb_checkpoints/
 .env
 .DS_Store
+venv/
+node_modules/
 
 # big artifacts
 data/
@@ -9,3 +11,9 @@ adapters/
 rag/**/chroma_store/
 *.safetensors
 *.bin
+
+# plans / drafts
+DEVELOPMENT_PLAN.md
+
+# claude context
+CLAUDE.md

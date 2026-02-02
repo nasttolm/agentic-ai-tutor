@@ -1,0 +1,35 @@
+"""
+Pydantic schemas for API requests/responses
+"""
+from pydantic import BaseModel
+
+
+class Message(BaseModel):
+    role: str  # "user" or "assistant"
+    content: str
+
+
+class ChatRequest(BaseModel):
+    subject: str
+    question: str
+    messages: list[Message] = []
+
+
+class Source(BaseModel):
+    file: str
+    text: str
+
+
+class ChatResponse(BaseModel):
+    answer: str
+    sources: list[Source]
+
+
+class SubjectInfo(BaseModel):
+    id: str
+    name: str
+
+
+class HealthResponse(BaseModel):
+    status: str
+    subjects_loaded: list[str]

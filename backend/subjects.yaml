@@ -1,0 +1,15 @@
+subjects:
+  fsd:
+    name: "Fundamentals of Software Development"
+    adapter: "lora_phi4mini_FSD"
+    rag: "fsd"
+
+  fcs:
+    name: "Fundamentals of Computer Science"
+    adapter: "lora_phi4mini_FCS"
+    rag: "fcs"
+
+  dma:
+    name: "Discrete Mathematics"
+    adapter: "lora_phi4mini_DMA"
+    rag: "dma"

@@ -383,6 +383,7 @@ Tables \ref{tab:metrics-fsd}-\ref{tab:metrics-dma} report the evaluation results
 \caption{Evaluation metrics on \texttt{eval\_OK} for FSD.}
 \label{tab:metrics-fsd}
 \small
+\resizebox{\linewidth}{!}{%
 \begin{tabular}{lrrrrrr}
 \toprule
 Model & BLEU & ROUGE-L & METEOR & BERTScore F1 & Latency (mean) & Latency (median) \\
@@ -392,6 +393,7 @@ LoRA     & 10.069 & 0.195 & 0.266 & 0.874 & 14.980 & 14.984 \\
 LoRA+RAG & 11.756 & 0.215 & 0.269 & 0.872 & 15.346 & 15.312 \\
 \bottomrule
 \end{tabular}
+}
 \end{table}
 
 \begin{table}[h]
@@ -399,6 +401,7 @@ LoRA+RAG & 11.756 & 0.215 & 0.269 & 0.872 & 15.346 & 15.312 \\
 \caption{Evaluation metrics on \texttt{eval\_OK} for FCS.}
 \label{tab:metrics-fcs}
 \small
+\resizebox{\linewidth}{!}{%
 \begin{tabular}{lrrrrrr}
 \toprule
 Model & BLEU & ROUGE-L & METEOR & BERTScore F1 & Latency (mean) & Latency (median) \\
@@ -408,6 +411,7 @@ LoRA     & 11.701 & 0.204 & 0.238 & 0.875 & 15.051 & 15.055 \\
 LoRA+RAG & 11.613 & 0.214 & 0.257 & 0.871 & 15.407 & 15.359 \\
 \bottomrule
 \end{tabular}
+}
 \end{table}
 
 \begin{table}[h]
@@ -415,6 +419,7 @@ LoRA+RAG & 11.613 & 0.214 & 0.257 & 0.871 & 15.407 & 15.359 \\
 \caption{Evaluation metrics on \texttt{eval\_OK} for DMA.}
 \label{tab:metrics-dma}
 \small
+\resizebox{\linewidth}{!}{%
 \begin{tabular}{lrrrrrr}
 \toprule
 Model & BLEU & ROUGE-L & METEOR & BERTScore F1 & Latency (mean) & Latency (median) \\
@@ -424,6 +429,7 @@ LoRA     & 9.500 & 0.192 & 0.248 & 0.868 & 15.393 & 15.357 \\
 LoRA+RAG & 10.558 & 0.193 & 0.255 & 0.865 & 15.844 & 15.831 \\
 \bottomrule
 \end{tabular}
+}
 \end{table}
 
 \subsection{Analysis}
