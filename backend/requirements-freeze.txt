@@ -9,7 +9,7 @@ build==1.4.0
 certifi==2026.1.4
 charset-normalizer==3.4.4
 chroma-hnswlib==0.7.3
-chromadb==0.5.0
+chromadb==0.4.24
 click==8.3.1
 colorama==0.4.6
 coloredlogs==15.0.1
@@ -56,11 +56,12 @@ opentelemetry-util-http==0.60b1
 orjson==3.11.6
 overrides==7.7.0
 packaging==26.0
-peft==0.12.0
+peft==0.18.1
 pillow==12.1.0
 posthog==7.8.0
 protobuf==6.33.5
 psutil==7.2.2
+pulsar-client==3.9.0
 pydantic==2.9.0
 pydantic_core==2.23.2
 Pygments==2.19.2
