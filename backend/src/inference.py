@@ -2,7 +2,7 @@
 LoRA model inference
 """
 import torch
-from transformers import AutoTokenizer, AutoModelForCausalLM
+from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig
 from peft import PeftModel
 
 from .config import (
@@ -22,17 +22,26 @@ models: dict = {}
 def init_tokenizer():
     """Initialize tokenizer."""
     global tokenizer
-    tokenizer = AutoTokenizer.from_pretrained(BASE_MODEL)
+    # Use slow tokenizer to avoid tokenizer.json parsing issues
+    tokenizer = AutoTokenizer.from_pretrained(
+        BASE_MODEL,
+        use_fast=False,
+        trust_remote_code=True
+    )
 
 
 def init_base_model():
-    """Initialize base model with 4-bit quantization."""
+    """Initialize base model in float16 (no quantization)."""
     global base_model
+
+    # Load model in float16 without quantization
+    # Phi-4-mini is ~9GB in fp16, fits in 12GB VRAM
     base_model = AutoModelForCausalLM.from_pretrained(
         BASE_MODEL,
         torch_dtype=torch.float16,
         device_map="auto",
-        load_in_4bit=True,
+        trust_remote_code=True,
+        attn_implementation="eager",  # Use eager attention (no flash_attn required)
     )
 
 

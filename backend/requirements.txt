@@ -6,11 +6,12 @@ python-multipart==0.0.9
 
 # ML (install torch separately, see below)
 # torch - install via: pip install torch --index-url https://download.pytorch.org/whl/cu121
-transformers==4.44.0
+transformers==4.49.0
 peft==0.12.0
-accelerate==0.33.0
-bitsandbytes==0.43.0
+accelerate==1.3.0
+# bitsandbytes - optional, for 4-bit quantization (not required for float16 mode)
+# bitsandbytes==0.44.1
 
 # RAG
 chromadb==0.5.0
-sentence-transformers==3.0.0
+sentence-transformers>=3.0.0
