@@ -94,57 +94,52 @@ Before any downstream steps, an exploratory analysis of the teaching materials f
 In the pipeline, the main unit is a topic document. For each subject, all files that share the same Topic\_XX prefix are grouped together. Text is extracted from each file (PDF, PPTX, DOC/DOCX), and all extracted text within the same topic is concatenated into one topic-level document (for example, FSD\_Topic\_03).
 
 \paragraph{Corpus size and basic statistics.}
-Table \ref{tab:corpus-stats} reports the statistics at topic-document level. For FSD, the dataset contains 16 topic documents built from 31 PDF files, with a total of 24,318 words. Topic lengths range from 126 to 3,359 words (median 1,343 and standard deviation 943.5). The short minimum value means that some topics have limited extractable text (for example, slides with mainly images).
+Table \ref{tab:corpus-vocab} summarises corpus size and vocabulary statistics at topic-document level. FCS contains the largest amount of extracted text (41,073 words across 10 topics), followed by DMA (37,043 words across 10 topics), while FSD is smaller in total size (24,318 words) but contains more topics (16).
 
-For FCS, the dataset contains 10 topic documents built from 32 raw files (mainly PPTX and DOCX), with a total of 41,073 words. Topic lengths range from 1,851 to 8,291 words (median 3,830.5 and standard deviation 1,807.9), which means that most topics contain a substantial amount of text.
-
-For DMA, the dataset contains 10 topic documents built from 25 raw files (PDF, DOCX and one PPTX), with a total of 37,043 words. Topic lengths range from 908 to 7,960 words (median 3,016.5 and standard deviation 2,725.7), which reflects a mix of shorter notes and longer tutorial-style documents.
+Vocabulary statistics show a clear difference between subjects.
+DMA and FCS have similar relative vocabulary growth (2,317 and 2,628 unique words with TTR 0.063 and 0.064), whereas FSD contains the largest number of unique words (3,129) despite the smallest total word count, resulting in a substantially higher TTR (0.129). This suggests higher lexical variety in FSD materials, plausibly influenced by the presence of shorter topic documents and more heterogeneous terminology.
 
 \begin{table}[h]
-    \centering
-    \caption{Overview of the teaching corpora at topic-document level.}
-    \label{tab:corpus-stats}
-    \small
-    \setlength{\tabcolsep}{4pt}
-    \begin{tabular}{lrrrrrrr}
-        \toprule
-        Module & Topics & Words & Mean & Median & Min & Max & Std dev \\
-        \midrule
-        FSD & 16 & 24,318 & 1,519.9 & 1,343.0 & 126 & 3,359 & 943.5 \\
-        FCS & 10 & 41,073 & 4,107.3 & 3,830.5 & 1,851 & 8,291 & 1,807.9 \\
-        DMA & 10 & 37,043 & 3,704.3 & 3,016.5 & 908 & 7,960 & 2,725.7 \\
-        \bottomrule
-    \end{tabular}
+\centering
+\caption{Corpus size and vocabulary statistics at topic-document level.}
+\label{tab:corpus-vocab}
+\small
+\setlength{\tabcolsep}{6pt}
+\begin{tabular}{lrrrr}
+\toprule
+Module & Topics & Total words & Unique words & TTR (unique/total) \\
+\midrule
+DMA & 10 & 37,043 & 2,317 & 0.063 \\
+FCS & 10 & 41,073 & 2,628 & 0.064 \\
+FSD & 16 & 24,318 & 3,129 & 0.129 \\
+\bottomrule
+\end{tabular}
 \end{table}
 \FloatBarrier
 
-
-\paragraph{Distribution of page lengths.}
-Figures \ref{fig:fsd-topic-lengths}, \ref{fig:fcs-topic-lengths} and \ref{fig:dma-topic-lengths} show the distributions of topic lengths (words per topic document). Since each corpus contains only 10-16 topic documents, the histograms are sparse. However, they still show the overall size of each module and the presence of short and long topics. In particular, FCS and DMA contain several large topics, while FSD contains a few unusually short topics that may require further inspection.
+Figure \ref{fig:vocab-vs-tokens} provides a complementary visual comparison of corpus scale (total words) and vocabulary size (unique words), reinforcing the contrast between FCS as the largest corpus by volume and FSD as the most lexically diverse relative to its size.
 
 \begin{figure}[h]
     \centering
-    \includegraphics[width=\textwidth]{figs/FSD_length_distribution.png}
-    \caption{Distribution of topic lengths in the FSD corpus (words per topic document).}
-    \label{fig:fsd-topic-lengths}
+    \includegraphics[width=\textwidth]{figs/vocabulary_size_comparison.png}
+    \caption{Vocabulary size (unique words) versus total tokens for each subject corpus.}
+    \label{fig:vocab-vs-tokens}
 \end{figure}
 \FloatBarrier
 
-\begin{figure}[h]
-    \centering
-    \includegraphics[width=\textwidth]{figs/FCS_length_distribution.png}
-    \caption{Distribution of topic lengths in the FCS corpus (words per topic document).}
-    \label{fig:fcs-topic-lengths}
-\end{figure}
-\FloatBarrier
+Figure \ref{fig:topic-stats-bubble} provides a topic-level view across all subjects. The x-axis shows total words per topic document, and bubble size represents the number of unique words, making both length outliers and lexical variation explicit.
 
 \begin{figure}[h]
     \centering
-    \includegraphics[width=\textwidth]{figs/DMA_length_distribution.png}
-    \caption{Distribution of topic lengths in the DMA corpus (words per topic document).}
-    \label{fig:dma-topic-lengths}
+    \includegraphics[width=\textwidth]{figs/all_topics_bubble.png}
+    \caption{Topic-level statistics by subject. The x-axis shows total words per topic document; bubble size indicates the number of unique words.}
+    \label{fig:topic-stats-bubble}
 \end{figure}
 \FloatBarrier
+
+FCS contains one clear length outlier (Topic\_09 at 8,291 words), while DMA appears more polarised, combining multiple very large topics with several short ones. In FSD, most topics remain below 2,000 words, and two exceptionally short topics (126 and 181 words) stand out, consistent with limited extractable text in some slide-based materials. Bubble sizes further suggest that longer topics tend to introduce more unique terms, while FSD maintains relatively high lexical variety even in moderately sized topics.
+
+These distributional differences motivate a unified token-based chunking strategy for downstream QA generation. Chunking is essential for long, information-dense topics (especially in FCS and DMA) to fit within the model context window, while keeping preprocessing consistent for shorter FSD topics, which typically map to a single coherent chunk.
 
 \paragraph{Vocabulary and main topics.}
 The vocabulary of each corpus was analysed using the same preprocessing pipeline. Text is converted to lowercase and URL/email patterns are removed. Tokenisation keeps only alphabetic tokens with a minimum length of two characters. Common English stop words and a small set of domain-specific stop words are removed. Finally, the remaining tokens are lemmatised.
@@ -365,8 +360,8 @@ For each subject (FSD, FCS and DMA), all chunks are embedded using a lightweight
 Model quality was evaluated separately for each subject (FSD, FCS, DMA) using the corresponding eval\_OK subset. This evaluation set contains only question-answer pairs that passed the semi-automated GPT-based quality review and subsequent manual spot-checking. The same evaluation protocol and metrics were applied across all subjects to ensure a fair comparison between the three model variants:
 
 \begin{itemize}
-    \item \textbf{BASE}: the instruction-tuned base model without adaptation;
-    \item \textbf{LoRA}: the base model with a subject-specific LoRA adapter;
+    \item \textbf{BASE}: the instruction-tuned base model without adaptation,
+    \item \textbf{LoRA}: the base model with a subject-specific LoRA adapter,
     \item \textbf{LoRA+RAG}: the LoRA-adapted model augmented with retrieval of subject materials.
 \end{itemize}
 
@@ -431,6 +426,7 @@ LoRA+RAG & 10.558 & 0.193 & 0.255 & 0.865 & 15.844 & 15.831 \\
 \end{tabular}
 }
 \end{table}
+\FloatBarrier
 
 \subsection{Analysis}
 Across all three subjects, LoRA fine-tuning provides the largest quality improvement relative to the BASE model. The gains are consistent in lexical overlap (BLEU, ROUGE-L) and in semantic similarity (BERTScore). For example, BLEU approximately doubles in every subject: from 5.306 to 10.069 in FSD, from 6.525 to 11.701 in FCS, and from 5.656 to 9.500 in DMA. Similarly, BERTScore F1 increases from 0.841 to 0.874 in FSD, from 0.847 to 0.875 in FCS, and from 0.845 to 0.868 in DMA. These results indicate that subject-specific LoRA adapters successfully adapt the base model to the terminology and tutoring style of each module.
@@ -441,17 +437,17 @@ METEOR decreases from BASE to LoRA in all subjects, which can occur when the ada
 
 Finally, improvements in answer quality come with a runtime cost. Mean latency increases from approximately 12.4-12.7 seconds (BASE) to 15.0-15.4 seconds (LoRA), and to 15.3-15.8 seconds (LoRA+RAG). This increase is consistent with longer prompts (system role + retrieved context) and potentially longer tutor-style outputs.
 
-\subsection{Conclusion}
-Overall, the evaluation demonstrates that subject-specific LoRA fine-tuning is the main driver of quality improvements for the Agentic AI Tutor across all three modules. RAG provides additional gains, particularly in ROUGE-L and (in two subjects) BLEU, but its impact is not uniform across all metrics due to the sensitivity of overlap-based scores to phrasing variation. The final system therefore offers a clear trade-off: improved tutoring quality at the cost of moderately higher latency, with the strongest and most consistent benefits achieved by LoRA adaptation.
+\subsection{Key Findings}
+Overall, the evaluation demonstrates that subject-specific LoRA fine-tuning is the main driver of quality improvements for the Agentic AI Tutor across all three modules. RAG provides additional gains, particularly in ROUGE-L and (in two subjects) BLEU, but its impact is not uniform across all metrics due to the sensitivity of overlap-based scores to phrasing variation. The final system therefore offers a clear trade-off. Improve tutoring quality at the cost of moderately higher latency, with the strongest and most consistent benefits achieved by LoRA adaptation.
 
 These findings align with recent work on SLM-based orchestration in related domains. Phone et al. \parencite{IBN1113} evaluated LoRA-tuned TinyLlama-1.1B against GPT-5-nano and Mistral-Small-24B for intent-based networking tasks using the same metrics (BLEU, METEOR, ROUGE-L). Their results similarly show that domain-adapted SLMs achieve comparable or superior accuracy to larger LLMs while reducing inference time by approximately 20\%. This supports the broader conclusion that lightweight, fine-tuned SLMs represent an efficient alternative to general-purpose LLMs for specialised applications.
+
 
 \section{Model deployment}
 
 \section{Monitoring and maintenance}
 
 \section{Lifecycle management}
-
 
 \section{Reflection on the Progress}
 
