@@ -5,6 +5,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 
 from .config import load_subjects
 from .schemas import (
@@ -25,6 +26,7 @@ from .inference import (
     init_base_model,
     load_adapter,
     generate_response,
+    generate_response_stream,
     get_loaded_subjects,
 )
 
@@ -125,6 +127,29 @@ def chat(req: ChatRequest):
     ]
 
     return ChatResponse(answer=answer, sources=sources)
+
+
+@app.post("/api/chat/stream")
+def chat_stream(req: ChatRequest):
+    """Chat with AI tutor (streaming response)."""
+    if req.subject not in subjects:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unknown subject: {req.subject}"
+        )
+
+    # RAG retrieval
+    chunks = retrieve_chunks(req.subject, req.question)
+    context = build_context(chunks)
+
+    # Generate streaming response
+    history = [{"role": m.role, "content": m.content} for m in req.messages]
+
+    def generate():
+        for token in generate_response_stream(req.subject, req.question, history, context):
+            yield token
+
+    return StreamingResponse(generate(), media_type="text/plain")
 
 
 # -----------------------------------------------------------------------------

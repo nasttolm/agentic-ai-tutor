@@ -1,14 +1,11 @@
-FROM python:3.11-slim
+FROM pytorch/pytorch:2.2.0-cuda12.1-cudnn8-runtime
 
 WORKDIR /app
 
-# Install system dependencies
+# Install system dependencies for bitsandbytes
 RUN apt-get update && apt-get install -y \
     build-essential \
     && rm -rf /var/lib/apt/lists/*
-
-# Install PyTorch (CUDA)
-RUN pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cu121
 
 # Install Python dependencies
 COPY requirements.txt .
