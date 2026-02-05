@@ -95,7 +95,8 @@ def retrieve_chunks(subject: str, query: str, top_k: int = TOP_K) -> list[dict]:
             except Exception:
                 pass
 
-        results.append({"text": doc, "file": file_name})
+        similarity = 1 - distances[len(results)]  # Convert distance to similarity
+        results.append({"text": doc, "file": file_name, "similarity": similarity})
     return results
 
 

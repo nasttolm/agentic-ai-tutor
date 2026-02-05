@@ -18,6 +18,7 @@ class ChatRequest(BaseModel):
 class Source(BaseModel):
     file: str
     text: str
+    similarity: float = 0.0
 
 
 class ChatResponse(BaseModel):

@@ -5,6 +5,7 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 export interface Message {
   role: 'user' | 'assistant';
   content: string;
+  sources?: Source[];
 }
 
 export interface ChatRequest {
@@ -16,6 +17,7 @@ export interface ChatRequest {
 export interface Source {
   file: string;
   text: string;
+  similarity: number;
 }
 
 export interface ChatResponse {

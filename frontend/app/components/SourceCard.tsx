@@ -21,7 +21,12 @@ export function SourceCard({ source, index }: SourceCardProps) {
           {index + 1}
         </span>
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium text-gray-700 truncate">{source.file}</p>
+          <div className="flex items-center gap-2">
+            <p className="text-sm font-medium text-gray-700 truncate">{source.file}</p>
+            <span className="text-xs text-gray-400 flex-shrink-0">
+              {Math.round(source.similarity * 100)}%
+            </span>
+          </div>
           {!expanded && source.text && (
             <p className="text-xs text-gray-400 mt-1 line-clamp-1">{source.text}</p>
           )}

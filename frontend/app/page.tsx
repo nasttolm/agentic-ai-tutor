@@ -1,12 +1,11 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { api, Message, Subject, Source } from '@/lib/api';
-import { ChatMessage, LoadingMessage, SourceCard, SubjectTabs, ChatInput } from './components';
+import { api, Message, Subject } from '@/lib/api';
+import { ChatMessage, LoadingMessage, SubjectTabs, ChatInput } from './components';
 
 interface TabState {
   messages: Message[];
-  sources: Source[];
   input: string;
   loading: boolean;
 }
@@ -26,7 +25,6 @@ export default function Home() {
         data.forEach((subject) => {
           initialStates[subject.id] = {
             messages: [],
-            sources: [],
             input: '',
             loading: false,
           };
@@ -36,7 +34,7 @@ export default function Home() {
     }).catch(console.error);
   }, []);
 
-  const currentState = tabStates[activeTab] || { messages: [], sources: [], input: '', loading: false };
+  const currentState = tabStates[activeTab] || { messages: [], input: '', loading: false };
 
   // Auto-scroll to bottom when messages change
   useEffect(() => {
@@ -73,11 +71,11 @@ export default function Home() {
       const assistantMessage: Message = {
         role: 'assistant',
         content: response.answer,
+        sources: response.sources,
       };
 
       updateTabState(activeTab, {
         messages: [...newMessages, assistantMessage],
-        sources: response.sources,
         loading: false,
       });
     } catch (error) {
@@ -121,24 +119,6 @@ export default function Home() {
             </div>
           )}
 
-          {/* Sources */}
-          {currentState.sources.length > 0 && currentState.sources.some(s => s.file) && (
-            <div className="mt-8 pt-6 border-t border-gray-100">
-              <div className="flex items-center gap-2 mb-4">
-                <svg className="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-                <p className="text-xs font-medium text-gray-400 uppercase tracking-wide">Sources</p>
-              </div>
-              <div className="space-y-2">
-                {currentState.sources
-                  .filter(source => source.file)
-                  .map((source, index) => (
-                    <SourceCard key={index} source={source} index={index} />
-                  ))}
-              </div>
-            </div>
-          )}
         </div>
       </div>
 

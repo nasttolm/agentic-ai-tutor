@@ -120,9 +120,9 @@ def chat(req: ChatRequest):
     history = [{"role": m.role, "content": m.content} for m in req.messages]
     answer = generate_response(req.subject, req.question, history, context)
 
-    # Format sources (first 3, truncated)
+    # Format sources (first 3, with similarity score)
     sources = [
-        Source(file=c["file"], text=c["text"][:200])
+        Source(file=c["file"], text=c["text"][:200], similarity=round(c.get("similarity", 0), 2))
         for c in chunks[:3]
     ]
 
