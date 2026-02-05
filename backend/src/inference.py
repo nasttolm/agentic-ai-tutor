@@ -1,6 +1,7 @@
 """
 LoRA model inference
 """
+import time
 import torch
 from transformers import AutoTokenizer, AutoModelForCausalLM
 from peft import PeftModel
@@ -9,7 +10,6 @@ from .config import (
     BASE_MODEL,
     ADAPTERS_DIR,
     MAX_NEW_TOKENS,
-    TEMPERATURE,
     SYSTEM_PROMPT,
 )
 
@@ -58,6 +58,23 @@ def load_adapter(subject: str, adapter_name: str) -> bool:
     return True
 
 
+def _build_messages(question: str, history: list[dict], context: str) -> list[dict]:
+    """Build chat messages for the model."""
+    messages = [{"role": "system", "content": SYSTEM_PROMPT}]
+
+    if context.strip():
+        messages.append({
+            "role": "system",
+            "content": f"Course materials:\n{context}"
+        })
+
+    for msg in history[-10:]:
+        messages.append({"role": msg["role"], "content": msg["content"]})
+
+    messages.append({"role": "user", "content": question})
+    return messages
+
+
 def generate_response(
     subject: str,
     question: str,
@@ -69,22 +86,8 @@ def generate_response(
     if not model:
         raise ValueError(f"Model for subject '{subject}' not loaded")
 
-    # Build messages
-    messages = [{"role": "system", "content": SYSTEM_PROMPT}]
-
-    # Add context if available
-    if context.strip():
-        messages.append({
-            "role": "system",
-            "content": f"Course materials:\n{context}"
-        })
-
-    # Add history (last 10 messages)
-    for msg in history[-10:]:
-        messages.append({"role": msg["role"], "content": msg["content"]})
-
-    # Add current question
-    messages.append({"role": "user", "content": question})
+    messages = _build_messages(question, history, context)
+    start_time = time.time()
 
     # Tokenize
     input_ids = tokenizer.apply_chat_template(
@@ -110,6 +113,10 @@ def generate_response(
     )
     # Remove Phi model end tokens
     response = response.replace("<|end|>", "").replace("<|endoftext|>", "").strip()
+
+    elapsed = time.time() - start_time
+    print(f"[Inference] {subject}: {elapsed:.2f}s")
+
     return response
 
 
@@ -132,19 +139,7 @@ def generate_response_stream(
     if not model:
         raise ValueError(f"Model for subject '{subject}' not loaded")
 
-    # Build messages
-    messages = [{"role": "system", "content": SYSTEM_PROMPT}]
-
-    if context.strip():
-        messages.append({
-            "role": "system",
-            "content": f"Course materials:\n{context}"
-        })
-
-    for msg in history[-10:]:
-        messages.append({"role": msg["role"], "content": msg["content"]})
-
-    messages.append({"role": "user", "content": question})
+    messages = _build_messages(question, history, context)
 
     # Tokenize
     input_ids = tokenizer.apply_chat_template(

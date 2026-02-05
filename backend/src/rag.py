@@ -1,7 +1,6 @@
 """
 RAG retrieval using ChromaDB
 """
-import json
 import re
 
 import chromadb
