@@ -13,6 +13,10 @@ ADAPTERS_DIR = BASE_DIR / "adapters"
 RAG_DIR = BASE_DIR / "rag"
 CONFIG_PATH = Path(__file__).parent.parent / "subjects.yaml"
 
+# Single-subject mode (for microservices)
+# If SUBJECT env var is set, only load that subject
+SUBJECT = os.getenv("SUBJECT", None)  # e.g., "fsd", "fcs", "dma"
+
 # Model settings
 BASE_MODEL = "microsoft/Phi-4-mini-instruct"
 EMBED_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
@@ -36,6 +40,19 @@ SYSTEM_PROMPT = (
 
 
 def load_subjects() -> dict:
-    """Load subjects configuration from YAML."""
+    """Load subjects configuration from YAML.
+
+    If SUBJECT env var is set, returns only that subject.
+    Otherwise, returns all subjects (backward compatible).
+    """
     with open(CONFIG_PATH, "r", encoding="utf-8") as f:
-        return yaml.safe_load(f)["subjects"]
+        all_subjects = yaml.safe_load(f)["subjects"]
+
+    if SUBJECT:
+        if SUBJECT not in all_subjects:
+            raise ValueError(f"Unknown subject: {SUBJECT}. Available: {list(all_subjects.keys())}")
+        print(f"[Config] Single-subject mode: {SUBJECT}")
+        return {SUBJECT: all_subjects[SUBJECT]}
+
+    print(f"[Config] Multi-subject mode: {list(all_subjects.keys())}")
+    return all_subjects

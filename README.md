@@ -30,34 +30,50 @@ AI Tutor system built from subject-specific Small Language Models (SLMs) for thr
 
 ### MLOps & Infrastructure
 
-| Component | Technology | Alternative Considered |
-|-----------|------------|------------------------|
-| Containerisation | **Docker** | Podman |
-| Orchestration | **Kubernetes** / EKS | AWS ECS, Docker Swarm |
-| CI/CD | **GitHub Actions** + **Argo CD** | Jenkins, Tekton |
+| Component | Technology |
+|-----------|------------|
+| Containerisation | **Docker** + Docker Compose |
+| Orchestration | **Kubernetes** / EKS |
+| CI/CD | **GitHub Actions** + **Argo CD** |
 
 ### Application Layer
 
 | Component | Technology |
 |-----------|------------|
 | Backend API | **FastAPI** (Python) |
-| Frontend | **Next.js** |
+| Frontend | **Next.js** + React + TypeScript |
 | TTS | **Piper** (MIT license) |
 | Talking-head | **SadTalker** (Apache 2.0) |
 
-### Evaluation Metrics
+### Evaluation Metrics (Completed)
 
 | Metric | Purpose |
 |--------|---------|
-| BLEU-2 | N-gram precision |
+| BLEU | N-gram precision |
 | ROUGE-L | Sequence overlap |
 | METEOR | Semantic similarity |
 | BERTScore | Embedding-based similarity |
+
+Results available in `dissertation/chapters/plan.tex` (Model evaluation section).
 
 ## Project Structure
 
 ```
 agentic-ai-tutor/
+├── backend/               # FastAPI backend
+│   ├── src/
+│   │   ├── main.py        # API endpoints
+│   │   ├── inference.py   # Model inference + LoRA
+│   │   ├── rag.py         # ChromaDB retrieval
+│   │   ├── config.py      # Configuration
+│   │   └── schemas.py     # Pydantic models
+│   ├── data/              # LoRA adapters + RAG indices
+│   └── requirements.txt
+├── frontend/              # Next.js frontend
+│   ├── app/
+│   │   ├── page.tsx       # Main chat page
+│   │   └── components/    # React components
+│   └── lib/api.ts         # API client
 ├── dissertation/          # LaTeX source
 │   ├── main.tex
 │   ├── chapters/
@@ -65,11 +81,13 @@ agentic-ai-tutor/
 ├── notebooks/             # Colab notebooks
 │   ├── FinalProject.ipynb         # Full pipeline
 │   └── FinalProject_metrics.ipynb # Evaluation
+├── docker-compose.yml
 └── README.md
 ```
 
 ## Architecture
 
+### Training Pipeline
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                     COURSE MATERIALS                         │
@@ -87,20 +105,47 @@ agentic-ai-tutor/
 ┌───────────────────────┐   ┌───────────────────────┐
 │    LoRA FINE-TUNING   │   │     RAG INDEXING      │
 │  (Phi-4-mini + PEFT)  │   │ (ChromaDB + embeddings)│
-└───────────┬───────────┘   └───────────┬───────────┘
-            │                           │
-            └─────────────┬─────────────┘
-                          ▼
-┌─────────────────────────────────────────────────────────────┐
-│                   INFERENCE PIPELINE                         │
-│       Query → RAG Retrieval → LoRA Model → Response          │
-└─────────────────────────────────────────────────────────────┘
-                          │
-                          ▼
-┌─────────────────────────────────────────────────────────────┐
-│                   DEPLOYMENT (MLOps)                         │
-│     Docker → Kubernetes → GitHub Actions → Argo CD           │
-└─────────────────────────────────────────────────────────────┘
+└───────────────────────┘   └───────────────────────┘
+```
+
+### CI/CD Pipeline
+```
+┌──────────────┐      ┌──────────────┐      ┌──────────────┐
+│    GitHub    │      │    GHCR      │      │   Argo CD    │
+│   Actions    │ ───► │   (Images)   │ ───► │   (GitOps)   │
+│   (CI)       │      │              │      │   (CD)       │
+└──────────────┘      └──────────────┘      └──────────────┘
+```
+
+### Deployment (Microservices)
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                        KUBERNETES / EKS                              │
+│                                                                      │
+│  ┌─────────────────────────────────────────────────────────────┐    │
+│  │                        INGRESS                               │    │
+│  └───────────┬─────────────────┬─────────────────┬─────────────┘    │
+│              │                 │                 │                   │
+│      ┌───────▼───────┐ ┌───────▼───────┐ ┌───────▼───────┐          │
+│      │  FSD Service  │ │  FCS Service  │ │  DMA Service  │          │
+│      │  (FastAPI)    │ │  (FastAPI)    │ │  (FastAPI)    │          │
+│      ├───────────────┤ ├───────────────┤ ├───────────────┤          │
+│      │ Phi-4-mini    │ │ Phi-4-mini    │ │ Phi-4-mini    │          │
+│      │ + LoRA (FSD)  │ │ + LoRA (FCS)  │ │ + LoRA (DMA)  │          │
+│      │ + RAG (FSD)   │ │ + RAG (FCS)   │ │ + RAG (DMA)   │          │
+│      │ + Piper TTS   │ │ + Piper TTS   │ │ + Piper TTS   │          │
+│      └───────┬───────┘ └───────┬───────┘ └───────┬───────┘          │
+│              │                 │                 │                   │
+│              ▼                 ▼                 ▼                   │
+│      ┌─────────────────────────────────────────────────────┐        │
+│      │                  GPU NODE (CUDA)                     │        │
+│      └─────────────────────────────────────────────────────┘        │
+│                                                                      │
+│  ┌─────────────────┐      ┌─────────────────┐                       │
+│  │    Frontend     │      │   SadTalker     │                       │
+│  │   (Next.js)     │      │  (Video Gen)    │                       │
+│  └─────────────────┘      └─────────────────┘                       │
+└─────────────────────────────────────────────────────────────────────┘
 ```
 
 ## Author

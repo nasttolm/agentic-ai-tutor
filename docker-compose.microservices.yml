@@ -1,0 +1,102 @@
+# Microservices architecture: 3 separate backend services (one per subject)
+# Each service loads only its own LoRA adapter and RAG index
+
+services:
+  # ============================================================================
+  # Backend Services (one per subject)
+  # ============================================================================
+  fsd-service:
+    build: ./backend
+    container_name: ai-tutor-fsd
+    ports:
+      - "8001:8000"
+    volumes:
+      - ${DATA_PATH:-./backend/data}:/data:ro
+    environment:
+      - DATA_DIR=/data
+      - SUBJECT=fsd
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  fcs-service:
+    build: ./backend
+    container_name: ai-tutor-fcs
+    ports:
+      - "8002:8000"
+    volumes:
+      - ${DATA_PATH:-./backend/data}:/data:ro
+    environment:
+      - DATA_DIR=/data
+      - SUBJECT=fcs
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  dma-service:
+    build: ./backend
+    container_name: ai-tutor-dma
+    ports:
+      - "8003:8000"
+    volumes:
+      - ${DATA_PATH:-./backend/data}:/data:ro
+    environment:
+      - DATA_DIR=/data
+      - SUBJECT=dma
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ============================================================================
+  # Frontend
+  # ============================================================================
+  frontend:
+    build: ./frontend
+    container_name: ai-tutor-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      # Frontend will route to different services based on subject
+      - NEXT_PUBLIC_FSD_API_URL=http://fsd-service:8000
+      - NEXT_PUBLIC_FCS_API_URL=http://fcs-service:8000
+      - NEXT_PUBLIC_DMA_API_URL=http://dma-service:8000
+    depends_on:
+      - fsd-service
+      - fcs-service
+      - dma-service
+    restart: unless-stopped
+
+# Note: For production with Kubernetes, use Ingress to route:
+# /api/fsd/* -> fsd-service
+# /api/fcs/* -> fcs-service
+# /api/dma/* -> dma-service

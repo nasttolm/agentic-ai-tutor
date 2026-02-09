@@ -1,5 +1,9 @@
 """
 AI Tutor Backend - FastAPI Application
+
+Supports two modes:
+- Multi-subject mode (default): loads all subjects
+- Single-subject mode: set SUBJECT env var (e.g., SUBJECT=fsd)
 """
 from contextlib import asynccontextmanager
 
@@ -7,7 +11,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 
-from .config import load_subjects
+from .config import load_subjects, SUBJECT
 from .schemas import (
     ChatRequest,
     ChatResponse,
@@ -66,9 +70,16 @@ async def lifespan(app: FastAPI):
 
 
 # FastAPI app
+_title = f"AI Tutor API ({SUBJECT.upper()})" if SUBJECT else "AI Tutor API"
+_description = (
+    f"AI tutoring for {SUBJECT.upper()} with LoRA + RAG"
+    if SUBJECT
+    else "Subject-specific AI tutoring with LoRA + RAG"
+)
+
 app = FastAPI(
-    title="AI Tutor API",
-    description="Subject-specific AI tutoring with LoRA + RAG",
+    title=_title,
+    description=_description,
     version="1.0.0",
     lifespan=lifespan,
 )
