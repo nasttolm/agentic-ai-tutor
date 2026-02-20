@@ -357,25 +357,74 @@ For each subject (FSD, FCS and DMA), all chunks are embedded using a lightweight
 
 \section{Model evaluation and testing}
 
-Model quality was evaluated separately for each subject (FSD, FCS, DMA) using the corresponding eval\_OK subset. This evaluation set contains only question-answer pairs that passed the semi-automated GPT-based quality review and subsequent manual spot-checking. The same evaluation protocol and metrics were applied across all subjects to ensure a fair comparison between the three model variants:
+Model quality was evaluated separately for each subject (FSD, FCS, DMA) using the corresponding eval\_OK subset. This evaluation set contains only question-answer pairs that passed the semi-automated GPT-based quality review and subsequent manual spot-checking.
 
+We compared five model variants:
 \begin{itemize}
     \item \textbf{BASE}: the instruction-tuned base model without adaptation,
     \item \textbf{LoRA}: the base model with a subject-specific LoRA adapter,
-    \item \textbf{LoRA+RAG}: the LoRA-adapted model augmented with retrieval of subject materials.
+    \item \textbf{LoRA+RAG}: the LoRA-adapted model augmented with retrieval of subject materials,
+    \item \textbf{GPT-4B}: an external LLM baseline,
+    \item \textbf{Llama-70B}: an external LLM baseline.
 \end{itemize}
 
+All metrics were computed within each subject (FSD/FCS/DMA) using the same evaluation script and the same prompt format. Each model answer was compared to the held-out reference tutor answer.
+
 \subsection{Metrics}
-Five automatic metrics were used to quantify output quality and runtime efficiency: BLEU, ROUGE-L, METEOR, and BERTScore (F1) were computed between model answers and the ground-truth tutor answers in the evaluation set. In addition, latency was measured as mean and median inference time per example (seconds) to capture the practical cost of model improvements.
-
-All metrics were computed strictly within each subject (FSD/FCS/DMA), comparing BASE, LoRA, and LoRA+RAG under the same prompt format and evaluation script.
-
-\subsection{Results}
-Tables \ref{tab:metrics-fsd}-\ref{tab:metrics-dma} report the evaluation results for each subject.
+To measure answer quality, we use both lexical overlap metrics (how much the text matches the reference wording) and a semantic similarity metric (how similar the meaning is even if the wording changes). We also report runtime (latency). Lexical-overlap metrics (BLEU, ROUGE-L, METEOR) reward shared words and phrases, so they are sensitive to paraphrasing. Semantic similarity (BERTScore) is more robust to paraphrase. It can increase even if lexical overlap stays modest.
 
 \begin{table}[h]
 \centering
-\caption{Evaluation metrics on \texttt{eval\_OK} for FSD.}
+\caption{Metric units and value ranges used in this evaluation.}
+\label{tab:metric-units-ranges}
+\small
+\resizebox{\linewidth}{!}{%
+\begin{tabular}{lll}
+\toprule
+\textbf{Metric} & \textbf{Units} & \textbf{Typical range} \\
+\midrule
+BLEU-2 & Percent scale & 0-100 \\
+ROUGE-L & Fraction (float) & 0.0-1.0 \\
+METEOR & Fraction (float) & 0.0-1.0 \\
+BERTScore F1 & Fraction (float), rescaled & 0.0-1.0 \\
+Latency (mean / median) & Seconds & No fixed range \\
+\bottomrule
+\end{tabular}}
+\end{table}
+\FloatBarrier
+
+\paragraph{BLEU (lexical overlap).}
+BLEU measures modified n-gram precision between a candidate answer and a reference answer, with a brevity penalty for very short outputs \parencite{BleuaMet4:online}. In this project, BLEU is reported on a 0-100 scale. In tutoring-style answers, BLEU is usually low because there are many correct ways to explain the same idea.
+
+\paragraph{ROUGE-L (lexical overlap).}
+ROUGE-L is based on the longest common subsequence (LCS) between candidate and reference \parencite{ROUGEAPa16:online}. It is reported in the 0-1 range: 1 means identical text order, 0 means no overlap in sequence.
+
+\paragraph{METEOR (lexical overlap with flexible matching).}
+METEOR aligns candidate and reference using unigram matches (including stemming and synonymy) and combines precision and recall with a fragmentation penalty \parencite{METEORAn22:online}. It is also reported in the 0-1 range.
+
+\paragraph{BERTScore F1 (semantic similarity).}
+BERTScore compares candidate and reference using contextual embeddings and reports F1 similarity \parencite{Zhang2019BERTScore}. Higher values mean the meaning is closer even if words differ. 
+
+\paragraph{Latency.}
+Latency is reported as mean and median inference time per example (seconds). Lower is better.
+
+\subsection{Results}
+
+Tables \ref{tab:metrics-fsd}-\ref{tab:metrics-dma} report the evaluation results for each subject.
+
+\paragraph{Colour coding (SLM variants only).}
+In the tables below, colour is applied only within the three local variants: BASE, LoRA, and LoRA+RAG.
+For each metric column:
+\begin{itemize}
+    \item \textcolor{blue}{Blue} marks the \textbf{best} value among BASE/LoRA/LoRA+RAG.
+    \item \textcolor{red}{Red} marks the \textbf{worst} value among BASE/LoRA/LoRA+RAG.
+\end{itemize}
+For quality metrics (BLEU, ROUGE-L, METEOR, BERTScore F1), \textbf{higher is better}.
+For latency (mean/median seconds), \textbf{lower is better}.
+
+\begin{table}[h]
+\centering
+\caption{Evaluation metrics on \texttt{eval\_OK} for FSD (SLMs vs.\ LLM baselines).}
 \label{tab:metrics-fsd}
 \small
 \resizebox{\linewidth}{!}{%
@@ -383,17 +432,22 @@ Tables \ref{tab:metrics-fsd}-\ref{tab:metrics-dma} report the evaluation results
 \toprule
 Model & BLEU & ROUGE-L & METEOR & BERTScore F1 & Latency (mean) & Latency (median) \\
 \midrule
-BASE     & 5.306 & 0.129 & 0.287 & 0.841 & 12.415 & 12.425 \\
-LoRA     & 10.069 & 0.195 & 0.266 & 0.874 & 14.980 & 14.984 \\
-LoRA+RAG & 11.756 & 0.215 & 0.269 & 0.872 & 15.346 & 15.312 \\
+BASE     & \worst{5.260}  & \worst{0.129} & \best{0.297}  & \worst{0.062} & \best{27.116} & \best{26.808} \\
+LoRA     & 10.028         & 0.186         & \worst{0.263} & \best{0.257}  & 29.050        & 28.833 \\
+LoRA+RAG & \best{11.161}  & \best{0.209}  & 0.268         & 0.242         & \worst{29.493}& \worst{29.041} \\
+\midrule
+LLM (Llama-3.3-70B) & 8.958 & 0.212 & 0.310 & 0.194 & 2.475 & 2.647 \\
+LLM (Qwen3-32B)     & 7.761 & 0.155 & 0.301 & 0.153 & 2.527 & 2.687 \\
 \bottomrule
 \end{tabular}
 }
 \end{table}
+\FloatBarrier
+
 
 \begin{table}[h]
 \centering
-\caption{Evaluation metrics on \texttt{eval\_OK} for FCS.}
+\caption{Evaluation metrics on \texttt{eval\_OK} for FCS (SLMs vs.\ LLM baselines).}
 \label{tab:metrics-fcs}
 \small
 \resizebox{\linewidth}{!}{%
@@ -401,17 +455,21 @@ LoRA+RAG & 11.756 & 0.215 & 0.269 & 0.872 & 15.346 & 15.312 \\
 \toprule
 Model & BLEU & ROUGE-L & METEOR & BERTScore F1 & Latency (mean) & Latency (median) \\
 \midrule
-BASE     & 6.525 & 0.133 & 0.295 & 0.847 & 12.485 & 12.471 \\
-LoRA     & 11.701 & 0.204 & 0.238 & 0.875 & 15.051 & 15.055 \\
-LoRA+RAG & 11.613 & 0.214 & 0.257 & 0.871 & 15.407 & 15.359 \\
+BASE     & \worst{6.296}  & \worst{0.138} & \best{0.291}  & \worst{0.089} & \best{27.393} & \best{27.158} \\
+LoRA     & 11.810         & \best{0.211}  & 0.253         & \best{0.272}  & 29.279        & 28.827 \\
+LoRA+RAG & \best{12.105}  & 0.210         & \worst{0.238} & 0.247         & \worst{29.540}& \worst{29.191} \\
+\midrule
+LLM (Llama-3.3-70B) & 11.617 & 0.237 & 0.346 & 0.243 & 2.553 & 2.649 \\
+LLM (Qwen3-32B)     & 8.937  & 0.166 & 0.317 & 0.152 & 2.612 & 2.697 \\
 \bottomrule
 \end{tabular}
 }
 \end{table}
+\FloatBarrier
 
 \begin{table}[h]
 \centering
-\caption{Evaluation metrics on \texttt{eval\_OK} for DMA.}
+\caption{Evaluation metrics on \texttt{eval\_OK} for DMA (SLMs vs.\ LLM baselines).}
 \label{tab:metrics-dma}
 \small
 \resizebox{\linewidth}{!}{%
@@ -419,9 +477,12 @@ LoRA+RAG & 11.613 & 0.214 & 0.257 & 0.871 & 15.407 & 15.359 \\
 \toprule
 Model & BLEU & ROUGE-L & METEOR & BERTScore F1 & Latency (mean) & Latency (median) \\
 \midrule
-BASE     & 5.656 & 0.132 & 0.291 & 0.845 & 12.724 & 12.702 \\
-LoRA     & 9.500 & 0.192 & 0.248 & 0.868 & 15.393 & 15.357 \\
-LoRA+RAG & 10.558 & 0.193 & 0.255 & 0.865 & 15.844 & 15.831 \\
+BASE     & \worst{5.851}  & \worst{0.130} & \best{0.291}  & \worst{0.082} & \best{26.433} & \best{25.985} \\
+LoRA     & 9.282          & 0.196         & \worst{0.255} & 0.208         & 28.444        & 27.638 \\
+LoRA+RAG & \best{10.293}  & \best{0.203}  & 0.263         & \best{0.218}  & \worst{28.829}& \worst{28.390} \\
+\midrule
+LLM (Llama-3.3-70B) & 9.805 & 0.211 & 0.337 & 0.211 & 2.599 & 2.661 \\
+LLM (Qwen3-32B)     & 7.595 & 0.152 & 0.299 & 0.120 & 2.525 & 2.665 \\
 \bottomrule
 \end{tabular}
 }
@@ -429,19 +490,117 @@ LoRA+RAG & 10.558 & 0.193 & 0.255 & 0.865 & 15.844 & 15.831 \\
 \FloatBarrier
 
 \subsection{Analysis}
-Across all three subjects, LoRA fine-tuning provides the largest quality improvement relative to the BASE model. The gains are consistent in lexical overlap (BLEU, ROUGE-L) and in semantic similarity (BERTScore). For example, BLEU approximately doubles in every subject: from 5.306 to 10.069 in FSD, from 6.525 to 11.701 in FCS, and from 5.656 to 9.500 in DMA. Similarly, BERTScore F1 increases from 0.841 to 0.874 in FSD, from 0.847 to 0.875 in FCS, and from 0.845 to 0.868 in DMA. These results indicate that subject-specific LoRA adapters successfully adapt the base model to the terminology and tutoring style of each module.
 
-The effect of RAG) is positive but not strictly monotonic across all metrics. In FSD and DMA, LoRA+RAG further improves BLEU and ROUGE-L compared to LoRA, suggesting that retrieved chunks help the model stay closer to the reference answers. In FCS, LoRA+RAG improves ROUGE-L and partially recovers METEOR (0.238 to 0.257), but slightly reduces BLEU and BERTScore compared to LoRA. This pattern is expected in RAG settings: adding retrieved context can introduce additional details or alternative phrasing. While this may improve grounding and factual alignment with the source materials, it does not always increase lexical overlap with a single reference answer, especially when multiple correct explanations exist.
+\paragraph{How to read the numbers.}
+BLEU and ROUGE-L are lexical-overlap metrics. They reward using the same words and similar word order as the single reference tutor answer. BLEU is reported on a 0-100 scale (here mostly 5-12 for SLMs), so low absolute values mainly mean limited exact phrase overlap, which is normal when many correct tutor-style phrasings exist. ROUGE-L (0-1) measures the longest common subsequence. Values around 0.13-0.22 indicate modest in-sequence overlap for multi-sentence explanations. METEOR (0-1) uses unigram matching (including flexible matching such as stemming/synonymy) and adds a penalty when matched words appear in fragmented order. Values around 0.24-0.30 here mean partial alignment to the reference. BERTScore F1 is a semantic-similarity metric. Higher values indicate stronger meaning similarity even when surface wording differs. In this project BERTScore is reported in a rescaled form.
 
-METEOR decreases from BASE to LoRA in all subjects, which can occur when the adapted model uses more technical and specific vocabulary that differs from the reference wording. LoRA+RAG partially mitigates this effect in FSD, FCS, and DMA, consistent with retrieval providing more shared phrasing or content alignment.
+\paragraph{BASE vs.\ LoRA (effect of fine-tuning).}
+Figure \ref{fig:all-bleu} and Figure \ref{fig:all-bertscore} summarise the main improvements from BASE to LoRA across subjects.
 
-Finally, improvements in answer quality come with a runtime cost. Mean latency increases from approximately 12.4-12.7 seconds (BASE) to 15.0-15.4 seconds (LoRA), and to 15.3-15.8 seconds (LoRA+RAG). This increase is consistent with longer prompts (system role + retrieved context) and potentially longer tutor-style outputs.
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=\linewidth]{figs/all_bleu.png}
+    \caption{BLEU-2 across subjects for all models.}
+    \label{fig:all-bleu}
+\end{figure}
 
-\subsection{Key Findings}
-Overall, the evaluation demonstrates that subject-specific LoRA fine-tuning is the main driver of quality improvements for the Agentic AI Tutor across all three modules. RAG provides additional gains, particularly in ROUGE-L and (in two subjects) BLEU, but its impact is not uniform across all metrics due to the sensitivity of overlap-based scores to phrasing variation. The final system therefore offers a clear trade-off. Improve tutoring quality at the cost of moderately higher latency, with the strongest and most consistent benefits achieved by LoRA adaptation.
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=\linewidth]{figs/all_bertscore.png}
+    \caption{BERTScore F1 across subjects for all models.}
+    \label{fig:all-bertscore}
+\end{figure}
+\FloatBarrier
 
-These findings align with recent work on SLM-based orchestration in related domains. Phone et al. \parencite{IBN1113} evaluated LoRA-tuned TinyLlama-1.1B against GPT-5-nano and Mistral-Small-24B for intent-based networking tasks using the same metrics (BLEU, METEOR, ROUGE-L). Their results similarly show that domain-adapted SLMs achieve comparable or superior accuracy to larger LLMs while reducing inference time by approximately 20\%. This supports the broader conclusion that lightweight, fine-tuned SLMs represent an efficient alternative to general-purpose LLMs for specialised applications.
+Across all three subjects, LoRA improves BLEU-2, ROUGE-L, and BERTScore compared to BASE:
+\begin{itemize}
+    \item \textbf{FSD:} BLEU-2 increases from 5.260 to 10.028, ROUGE-L from 0.129 to 0.186, and BERTScore F1 from 0.062 to 0.257.
+    \item \textbf{FCS:} BLEU-2 increases from 6.296 to 11.810, ROUGE-L from 0.138 to 0.211, and BERTScore F1 from 0.089 to 0.272.
+    \item \textbf{DMA:} BLEU-2 increases from 5.851 to 9.282, ROUGE-L from 0.130 to 0.196, and BERTScore F1 from 0.082 to 0.208.
+\end{itemize}
+These gains mean the LoRA adapters help the SLM follow subject terminology and produce explanations that are closer to the reference answers both in surface form (BLEU-2/ROUGE-L) and in meaning (BERTScore).
 
+\paragraph{LoRA vs.\ LoRA+RAG (effect of retrieval).}
+Figure \ref{fig:all-rougeL} helps to see that ROUGE-L gains from retrieval are smaller and sometimes mixed.
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=\linewidth]{figs/all_rougeL.png}
+    \caption{ROUGE-L across subjects for all models.}
+    \label{fig:all-rougeL}
+\end{figure}
+\FloatBarrier
+RAG gives smaller but still visible improvements, mostly for BLEU-2 and ROUGE-L:
+\begin{itemize}
+    \item \textbf{FSD:} BLEU-2 improves (10.028 $\rightarrow$ 11.161) and ROUGE-L improves (0.186 $\rightarrow$ 0.209).
+    \item \textbf{DMA:} BLEU-2 improves (9.282 $\rightarrow$ 10.293) and ROUGE-L improves (0.196 $\rightarrow$ 0.203).
+    \item \textbf{FCS:} BLEU-2 improves slightly (11.810 $\rightarrow$ 12.105), while ROUGE-L stays almost unchanged (0.211 $\rightarrow$ 0.210).
+\end{itemize}
+This mixed pattern is expected for RAG. Retrieved text can improve factual coverage and add correct details, but it can also change phrasing and structure. Because overlap metrics compare to a single reference answer, a correct answer with different wording can score slightly lower even if it is useful for students.
+
+\paragraph{Why METEOR goes down for SLMs.}
+This trend is visible in Figure \ref{fig:all-meteor}.
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=\linewidth]{figs/all_meteor.png}
+    \caption{METEOR across subjects for all models.}
+    \label{fig:all-meteor}
+\end{figure}
+\FloatBarrier
+In all three subjects, METEOR is highest for BASE and lower for LoRA / LoRA+RAG. This does not automatically mean worse tutoring quality. A likely reason is that LoRA and RAG introduce more domain-specific wording and different sentence structure, which can make unigram alignment more fragmented relative to one reference answer. At the same time, BLEU-2, ROUGE-L, and BERTScore show clear improvements, suggesting better overall alignment in wording and meaning.
+
+\paragraph{Comparing our SLMs to LLM baselines.}
+The BASE model is Phi-4-mini-instruct (approximately 3.8-4.2B parameters). We compare the subject-specific variants (BASE, LoRA, LoRA+RAG) to two larger LLM baselines (Llama-3.3-70B and Qwen3-32B).
+
+The most important observation is that the adapted SLMs become competitive on several metrics:
+
+\begin{itemize}
+    \item \textbf{BLEU-2:} In all subjects, the best SLM (LoRA+RAG) is higher than both LLMs
+    (FSD: 11.161 vs.\ Llama 8.958 vs.\ Qwen 7.761,
+     FCS: 12.105 vs.\ 11.617 vs.\ 8.937,
+     DMA: 10.293 vs.\ 9.805 vs.\ 7.595).
+    This suggests our fine-tuning data strongly aligns the SLM outputs with the tutor reference phrasing used in the evaluation set.
+    \item \textbf{BERTScore F1:} The best SLM is also higher than both LLMs in all subjects
+    (FSD: 0.257 vs.\ 0.194 vs.\ 0.153,
+     FCS: 0.272 vs.\ 0.243 vs.\ 0.152,
+     DMA: 0.218 vs.\ 0.211 vs.\ 0.120),
+    showing that subject adaptation improves meaning similarity to the reference answers.
+    \item \textbf{ROUGE-L:} Llama remains slightly higher, but the gap is small in FSD
+    (FSD: 0.212 vs.\ best SLM 0.209).
+    In FCS and DMA the gap is larger (0.237 vs.\ 0.211, 0.211 vs.\ 0.203), while Qwen is consistently lower.
+    \item \textbf{METEOR:} The LLMs score higher, especially Llama (FSD: 0.310, FCS: 0.346, DMA: 0.337),
+    which is consistent with METEOR favouring closer word-level alignment and ordering relative to the single reference.
+\end{itemize}
+
+\paragraph{Latency.}
+Figures \ref{fig:all-lat-mean} and \ref{fig:all-lat-median} show the runtime cost in this setup.
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=\linewidth]{figs/all_latency_mean.png}
+    \caption{Mean latency (seconds) across subjects for all models.}
+    \label{fig:all-lat-mean}
+\end{figure}
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=\linewidth]{figs/all_latency_median.png}
+    \caption{Median latency (seconds) across subjects for all models.}
+    \label{fig:all-lat-median}
+\end{figure}
+\FloatBarrier
+In this setup, the LLM baselines are much faster (about 2.4-2.7 seconds) than the SLM variants (about 26-30 seconds). This is likely driven by differences in serving stack and hardware configuration rather than model size alone. Within the SLM variants, LoRA+RAG is usually the slowest because retrieval increases prompt length.
+
+
+\subsection{Key findings}
+LoRA fine-tuning is the main reason for quality improvement across FSD, FCS, and DMA. Compared to BASE (Phi-4-mini-instruct, 3.8-4.2B parameters), LoRA consistently increases BLEU-2, ROUGE-L, and BERTScore F1. This means the SLM becomes closer to the reference tutor answers both in wording (lexical overlap) and in meaning (semantic similarity). These improvements support the project aim: small, subject-specific models can be adapted to produce more tutor-like explanations without training a large model from scratch.
+
+RAG gives smaller and less consistent gains than LoRA. In FSD and DMA, LoRA+RAG improves BLEU-2 and ROUGE-L further, while in FCS the effect is mixed (BLEU-2 slightly increases, but ROUGE-L is almost unchanged). This is expected when evaluation uses only one reference answer: retrieval can add correct details or change phrasing, which may help tutoring quality but does not always increase overlap with a single reference.
+
+METEOR often decreases after LoRA/RAG. A likely reason is that adapted models use more domain-specific wording and a different sentence structure, which reduces word-level alignment and increases fragmentation relative to the single reference, even when answers remain correct and clear.
+
+When comparing to the LLM baselines (Llama-3.3-70B and Qwen3-32B), the picture depends on the metric. The best SLM variants are already competitive and in this evaluation they outperform both LLMs on BLEU-2 and BERTScore F1 in all three subjects. At the same time, Llama generally remains higher on ROUGE-L and METEOR, which suggests closer word-order alignment to the reference. Finally, latency is mainly driven by the serving setup: in this environment the LLM baselines are much faster (about 2.4-2.7 seconds), while the SLM variants take about 26-30 seconds, and RAG increases runtime due to longer prompts.
 
 \section{Model deployment}
 
