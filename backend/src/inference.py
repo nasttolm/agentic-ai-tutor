@@ -3,15 +3,20 @@ LoRA model inference
 """
 import time
 import torch
-from transformers import AutoTokenizer, AutoModelForCausalLM
+from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig
 from peft import PeftModel
 
 from .config import (
     BASE_MODEL,
     ADAPTERS_DIR,
     MAX_NEW_TOKENS,
+    REPETITION_PENALTY,
+    LOAD_IN_4BIT,
     SYSTEM_PROMPT,
 )
+
+# Stop markers to strip from generated output
+STOP_MARKERS = ["<|im_end|>", "<|im_start|>", "<reponame>", "<gh_stars>"]
 
 # Global state
 tokenizer = None
@@ -31,15 +36,32 @@ def init_tokenizer():
 
 
 def init_base_model():
-    """Initialize base model in fp16."""
+    """Initialize base model (4-bit quantized if available, else fp16)."""
     global base_model
+
+    load_kwargs = {
+        "device_map": "auto",
+        "trust_remote_code": True,
+        "attn_implementation": "eager",
+    }
+
+    if LOAD_IN_4BIT:
+        try:
+            bnb_config = BitsAndBytesConfig(
+                load_in_4bit=True,
+                bnb_4bit_compute_dtype=torch.float16,
+            )
+            load_kwargs["quantization_config"] = bnb_config
+            print("[Inference] Loading model with 4-bit quantization")
+        except Exception as e:
+            print(f"[Inference] 4-bit quantization unavailable ({e}), falling back to fp16")
+            load_kwargs["torch_dtype"] = torch.float16
+    else:
+        load_kwargs["torch_dtype"] = torch.float16
 
     base_model = AutoModelForCausalLM.from_pretrained(
         BASE_MODEL,
-        torch_dtype=torch.float16,
-        device_map="auto",
-        trust_remote_code=True,
-        attn_implementation="eager",
+        **load_kwargs,
     )
 
 
@@ -56,6 +78,15 @@ def load_adapter(subject: str, adapter_name: str) -> bool:
     models[subject] = PeftModel.from_pretrained(base_model, str(adapter_path))
     models[subject].eval()
     return True
+
+
+def _clean_response(text: str) -> str:
+    """Strip stop markers and Phi end tokens from generated text."""
+    text = text.replace("<|end|>", "").replace("<|endoftext|>", "")
+    for marker in STOP_MARKERS:
+        if marker in text:
+            text = text[:text.index(marker)]
+    return text.strip()
 
 
 def _build_messages(question: str, history: list[dict], context: str) -> list[dict]:
@@ -103,16 +134,16 @@ def generate_response(
             input_ids=input_ids,
             max_new_tokens=MAX_NEW_TOKENS,
             do_sample=False,
+            repetition_penalty=REPETITION_PENALTY,
             pad_token_id=tokenizer.eos_token_id,
         )
 
-    # Decode
+    # Decode and clean
     response = tokenizer.decode(
         output[0][input_ids.shape[1]:],
         skip_special_tokens=True,
     )
-    # Remove Phi model end tokens
-    response = response.replace("<|end|>", "").replace("<|endoftext|>", "").strip()
+    response = _clean_response(response)
 
     elapsed = time.time() - start_time
     print(f"[Inference] {subject}: {elapsed:.2f}s")
@@ -161,6 +192,7 @@ def generate_response_stream(
         "input_ids": input_ids,
         "max_new_tokens": MAX_NEW_TOKENS,
         "do_sample": False,
+        "repetition_penalty": REPETITION_PENALTY,
         "pad_token_id": tokenizer.eos_token_id,
         "streamer": streamer,
     }
@@ -168,10 +200,26 @@ def generate_response_stream(
     thread = Thread(target=model.generate, kwargs=generation_kwargs)
     thread.start()
 
-    # Yield tokens as they come (filter out end tokens)
+    # Yield tokens as they come (filter out end/stop tokens)
+    accumulated = ""
+    stop_hit = False
     for token in streamer:
-        cleaned = token.replace("<|end|>", "").replace("<|endoftext|>", "")
-        if cleaned:
-            yield cleaned
+        if stop_hit:
+            continue
+        accumulated += token
+        # Check if any stop marker has appeared in accumulated text
+        for marker in STOP_MARKERS + ["<|end|>", "<|endoftext|>"]:
+            if marker in accumulated:
+                # Yield everything before the marker, then stop
+                before = accumulated[:accumulated.index(marker)]
+                if before:
+                    yield before
+                stop_hit = True
+                break
+        else:
+            # No marker found — yield the token
+            cleaned = token.replace("<|end|>", "").replace("<|endoftext|>", "")
+            if cleaned:
+                yield cleaned
 
     thread.join()

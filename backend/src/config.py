@@ -27,15 +27,17 @@ TOP_K = 6
 MAX_CONTEXT_TOKENS = 1400
 
 # Generation settings
-MAX_NEW_TOKENS = 512
+MAX_NEW_TOKENS = 192
 TEMPERATURE = 0.1  # Lower temperature = more factual, less creative
+REPETITION_PENALTY = 1.1
+LOAD_IN_4BIT = True
 
 # System prompt
 SYSTEM_PROMPT = (
-    "You are a helpful tutor for university courses. "
-    "IMPORTANT: Answer questions ONLY based on the course materials provided below. "
-    "Do NOT use external knowledge. If the answer is not in the course materials, say so. "
-    "Always cite specific examples from the provided materials."
+    "You are a helpful tutor. Answer clearly and step-by-step when appropriate. "
+    "Output ONLY the answer to the question. "
+    "Do NOT include repository names, metadata tags, or unrelated code. "
+    "If code is required, output only minimal code relevant to the question."
 )
 
 
