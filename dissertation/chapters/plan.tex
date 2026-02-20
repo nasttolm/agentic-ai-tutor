@@ -364,7 +364,7 @@ We compared five model variants:
     \item \textbf{BASE}: the instruction-tuned base model without adaptation,
     \item \textbf{LoRA}: the base model with a subject-specific LoRA adapter,
     \item \textbf{LoRA+RAG}: the LoRA-adapted model augmented with retrieval of subject materials,
-    \item \textbf{GPT-4B}: an external LLM baseline,
+    \item \textbf{Qwen3-32B}: an external LLM baseline,
     \item \textbf{Llama-70B}: an external LLM baseline.
 \end{itemize}
 
@@ -551,7 +551,7 @@ This trend is visible in Figure \ref{fig:all-meteor}.
 In all three subjects, METEOR is highest for BASE and lower for LoRA / LoRA+RAG. This does not automatically mean worse tutoring quality. A likely reason is that LoRA and RAG introduce more domain-specific wording and different sentence structure, which can make unigram alignment more fragmented relative to one reference answer. At the same time, BLEU-2, ROUGE-L, and BERTScore show clear improvements, suggesting better overall alignment in wording and meaning.
 
 \paragraph{Comparing our SLMs to LLM baselines.}
-The BASE model is Phi-4-mini-instruct (approximately 3.8-4.2B parameters). We compare the subject-specific variants (BASE, LoRA, LoRA+RAG) to two larger LLM baselines (Llama-3.3-70B and Qwen3-32B).
+The BASE model is Phi-4-mini-instruct (approximately 3.8B parameters). We compare the subject-specific variants (BASE, LoRA, LoRA+RAG) to two larger LLM baselines (Llama-3.3-70B and Qwen3-32B).
 
 The most important observation is that the adapted SLMs become competitive on several metrics:
 
@@ -594,7 +594,7 @@ In this setup, the LLM baselines are much faster (about 2.4-2.7 seconds) than th
 
 
 \subsection{Key findings}
-LoRA fine-tuning is the main reason for quality improvement across FSD, FCS, and DMA. Compared to BASE (Phi-4-mini-instruct, 3.8-4.2B parameters), LoRA consistently increases BLEU-2, ROUGE-L, and BERTScore F1. This means the SLM becomes closer to the reference tutor answers both in wording (lexical overlap) and in meaning (semantic similarity). These improvements support the project aim: small, subject-specific models can be adapted to produce more tutor-like explanations without training a large model from scratch.
+LoRA fine-tuning is the main reason for quality improvement across FSD, FCS, and DMA. Compared to BASE (Phi-4-mini-instruct, 3.8B parameters), LoRA consistently increases BLEU-2, ROUGE-L, and BERTScore F1. This means the SLM becomes closer to the reference tutor answers both in wording (lexical overlap) and in meaning (semantic similarity). These improvements support the project aim: small, subject-specific models can be adapted to produce more tutor-like explanations without training a large model from scratch.
 
 RAG gives smaller and less consistent gains than LoRA. In FSD and DMA, LoRA+RAG improves BLEU-2 and ROUGE-L further, while in FCS the effect is mixed (BLEU-2 slightly increases, but ROUGE-L is almost unchanged). This is expected when evaluation uses only one reference answer: retrieval can add correct details or change phrasing, which may help tutoring quality but does not always increase overlap with a single reference.
 
