@@ -1,0 +1,52 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+  namespace: ai-tutor
+  labels:
+    app: ai-tutor
+    component: frontend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: ai-tutor
+      component: frontend
+  template:
+    metadata:
+      labels:
+        app: ai-tutor
+        component: frontend
+    spec:
+      containers:
+        - name: frontend
+          image: ghcr.io/your-username/ai-tutor-frontend:latest
+          ports:
+            - containerPort: 3000
+          env:
+            # In Kubernetes, frontend calls services by their DNS names
+            - name: NEXT_PUBLIC_FSD_API_URL
+              value: "http://fsd-service.ai-tutor.svc.cluster.local"
+            - name: NEXT_PUBLIC_FCS_API_URL
+              value: "http://fcs-service.ai-tutor.svc.cluster.local"
+            - name: NEXT_PUBLIC_DMA_API_URL
+              value: "http://dma-service.ai-tutor.svc.cluster.local"
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 3000
+            initialDelaySeconds: 10
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 3000
+            initialDelaySeconds: 30
+            periodSeconds: 10

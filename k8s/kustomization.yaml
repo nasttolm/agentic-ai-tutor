@@ -1,0 +1,35 @@
+# Kustomization file for AI Tutor Kubernetes deployment
+# Usage: kubectl apply -k k8s/
+
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: ai-tutor
+
+resources:
+  - namespace.yaml
+  - storage.yaml
+  # Backend services
+  - fsd/deployment.yaml
+  - fsd/service.yaml
+  - fcs/deployment.yaml
+  - fcs/service.yaml
+  - dma/deployment.yaml
+  - dma/service.yaml
+  # Frontend
+  - frontend/deployment.yaml
+  - frontend/service.yaml
+  # Ingress
+  - ingress.yaml
+
+labels:
+  - pairs:
+      app: ai-tutor
+      managed-by: kustomize
+
+# Image customization (override in overlays)
+images:
+  - name: ghcr.io/your-username/ai-tutor-backend
+    newTag: latest
+  - name: ghcr.io/your-username/ai-tutor-frontend
+    newTag: latest
