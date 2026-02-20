@@ -1,0 +1,11 @@
+venv/
+data/
+__pycache__/
+*.pyc
+*.pyo
+.git/
+.env
+.env.*
+notebooks/
+tests/
+*.md

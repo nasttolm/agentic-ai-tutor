@@ -15,3 +15,6 @@ rag/**/chroma_store/
 # plans / drafts
 DEVELOPMENT_PLAN.md
 
+# tools / cache
+.claude/
+notebooks/unsloth_compiled_cache/

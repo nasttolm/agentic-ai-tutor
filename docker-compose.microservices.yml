@@ -11,7 +11,7 @@ services:
     ports:
       - "8001:8000"
     volumes:
-      - ${DATA_PATH:-./backend/data}:/data:ro
+      - ${DATA_PATH:-./backend/data}:/data
     environment:
       - DATA_DIR=/data
       - SUBJECT=fsd
@@ -24,7 +24,7 @@ services:
               capabilities: [gpu]
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -35,7 +35,7 @@ services:
     ports:
       - "8002:8000"
     volumes:
-      - ${DATA_PATH:-./backend/data}:/data:ro
+      - ${DATA_PATH:-./backend/data}:/data
     environment:
       - DATA_DIR=/data
       - SUBJECT=fcs
@@ -48,7 +48,7 @@ services:
               capabilities: [gpu]
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -59,7 +59,7 @@ services:
     ports:
       - "8003:8000"
     volumes:
-      - ${DATA_PATH:-./backend/data}:/data:ro
+      - ${DATA_PATH:-./backend/data}:/data
     environment:
       - DATA_DIR=/data
       - SUBJECT=dma
@@ -72,7 +72,7 @@ services:
               capabilities: [gpu]
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -81,15 +81,15 @@ services:
   # Frontend
   # ============================================================================
   frontend:
-    build: ./frontend
+    build:
+      context: ./frontend
+      args:
+        NEXT_PUBLIC_FSD_API_URL: http://localhost:8001
+        NEXT_PUBLIC_FCS_API_URL: http://localhost:8002
+        NEXT_PUBLIC_DMA_API_URL: http://localhost:8003
     container_name: ai-tutor-frontend
     ports:
       - "3000:3000"
-    environment:
-      # Frontend will route to different services based on subject
-      - NEXT_PUBLIC_FSD_API_URL=http://fsd-service:8000
-      - NEXT_PUBLIC_FCS_API_URL=http://fcs-service:8000
-      - NEXT_PUBLIC_DMA_API_URL=http://dma-service:8000
     depends_on:
       - fsd-service
       - fcs-service
