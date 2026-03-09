@@ -1,7 +1,32 @@
 # Microservices architecture: 3 separate backend services (one per subject)
-# Each service loads only its own LoRA adapter and RAG index
+# Each service loads only its own LoRA adapter (baked into image) and connects
+# to its dedicated ChromaDB HTTP service.
 
 services:
+  # ============================================================================
+  # ChromaDB Services (one per subject)
+  # ============================================================================
+  fsd-chroma:
+    image: chromadb/chroma:latest
+    container_name: ai-tutor-fsd-chroma
+    volumes:
+      - fsd-chroma-data:/chroma/chroma
+    restart: unless-stopped
+
+  fcs-chroma:
+    image: chromadb/chroma:latest
+    container_name: ai-tutor-fcs-chroma
+    volumes:
+      - fcs-chroma-data:/chroma/chroma
+    restart: unless-stopped
+
+  dma-chroma:
+    image: chromadb/chroma:latest
+    container_name: ai-tutor-dma-chroma
+    volumes:
+      - dma-chroma-data:/chroma/chroma
+    restart: unless-stopped
+
   # ============================================================================
   # Backend Services (one per subject)
   # ============================================================================
@@ -10,11 +35,12 @@ services:
     container_name: ai-tutor-fsd
     ports:
       - "8001:8000"
-    volumes:
-      - ${DATA_PATH:-./backend/data}:/data
     environment:
-      - DATA_DIR=/data
       - SUBJECT=fsd
+      - CHROMA_HOST=fsd-chroma
+      - CHROMA_PORT=8000
+    depends_on:
+      - fsd-chroma
     deploy:
       resources:
         reservations:
@@ -34,11 +60,12 @@ services:
     container_name: ai-tutor-fcs
     ports:
       - "8002:8000"
-    volumes:
-      - ${DATA_PATH:-./backend/data}:/data
     environment:
-      - DATA_DIR=/data
       - SUBJECT=fcs
+      - CHROMA_HOST=fcs-chroma
+      - CHROMA_PORT=8000
+    depends_on:
+      - fcs-chroma
     deploy:
       resources:
         reservations:
@@ -58,11 +85,12 @@ services:
     container_name: ai-tutor-dma
     ports:
       - "8003:8000"
-    volumes:
-      - ${DATA_PATH:-./backend/data}:/data
     environment:
-      - DATA_DIR=/data
       - SUBJECT=dma
+      - CHROMA_HOST=dma-chroma
+      - CHROMA_PORT=8000
+    depends_on:
+      - dma-chroma
     deploy:
       resources:
         reservations:
@@ -95,6 +123,11 @@ services:
       - fcs-service
       - dma-service
     restart: unless-stopped
+
+volumes:
+  fsd-chroma-data:
+  fcs-chroma-data:
+  dma-chroma-data:
 
 # Note: For production with Kubernetes, use Ingress to route:
 # /api/fsd/* -> fsd-service

@@ -1,0 +1,31 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fcs-chroma
+  namespace: ai-tutor
+  labels:
+    app: fcs-chroma
+    subject: fcs
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: fcs-chroma
+  template:
+    metadata:
+      labels:
+        app: fcs-chroma
+        subject: fcs
+    spec:
+      containers:
+        - name: chroma
+          image: chromadb/chroma:latest
+          ports:
+            - containerPort: 8000
+          volumeMounts:
+            - name: chroma-data
+              mountPath: /chroma/chroma
+      volumes:
+        - name: chroma-data
+          persistentVolumeClaim:
+            claimName: fcs-chroma-pvc

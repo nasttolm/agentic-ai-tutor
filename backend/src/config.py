@@ -6,12 +6,13 @@ import yaml
 from pathlib import Path
 
 # Paths
-# Default to ./data relative to backend/ for local development
-_default_data = Path(__file__).parent.parent / "data"
-BASE_DIR = Path(os.getenv("DATA_DIR", str(_default_data)))
-ADAPTERS_DIR = BASE_DIR / "adapters"
-RAG_DIR = BASE_DIR / "rag"
+_default_adapters = Path(__file__).parent.parent / "data" / "adapters"
+ADAPTERS_DIR = Path(os.getenv("ADAPTERS_DIR", str(_default_adapters)))
 CONFIG_PATH = Path(__file__).parent.parent / "subjects.yaml"
+
+# ChromaDB HTTP service
+CHROMA_HOST = os.getenv("CHROMA_HOST", "localhost")
+CHROMA_PORT = int(os.getenv("CHROMA_PORT", "8000"))
 
 # Single-subject mode (for microservices)
 # If SUBJECT env var is set, only load that subject

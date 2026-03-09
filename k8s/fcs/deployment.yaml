@@ -26,8 +26,10 @@ spec:
           env:
             - name: SUBJECT
               value: "fcs"
-            - name: DATA_DIR
-              value: "/data"
+            - name: CHROMA_HOST
+              value: "fcs-chroma"
+            - name: CHROMA_PORT
+              value: "8000"
           resources:
             requests:
               memory: "4Gi"
@@ -37,10 +39,6 @@ spec:
               memory: "12Gi"
               cpu: "4"
               nvidia.com/gpu: "1"
-          volumeMounts:
-            - name: data-volume
-              mountPath: /data
-              readOnly: true
           readinessProbe:
             httpGet:
               path: /health
@@ -53,10 +51,6 @@ spec:
               port: 8000
             initialDelaySeconds: 120
             periodSeconds: 30
-      volumes:
-        - name: data-volume
-          persistentVolumeClaim:
-            claimName: ai-tutor-data-pvc
       nodeSelector:
         nvidia.com/gpu: "true"
       tolerations:

@@ -4,10 +4,9 @@ RAG retrieval using ChromaDB
 import re
 
 import chromadb
-from chromadb.config import Settings
 from sentence_transformers import SentenceTransformer
 
-from .config import RAG_DIR, EMBED_MODEL, TOP_K, MAX_CONTEXT_TOKENS
+from .config import EMBED_MODEL, TOP_K, MAX_CONTEXT_TOKENS, CHROMA_HOST, CHROMA_PORT
 
 # Global embedder
 embedder: SentenceTransformer = None
@@ -21,23 +20,14 @@ def init_embedder():
 
 
 def init_rag_client(subject: str, rag_name: str) -> bool:
-    """Initialize ChromaDB client for a subject."""
-    rag_path = RAG_DIR / rag_name / "chroma_store"
-    if not rag_path.exists():
-        print(f"  Warning: RAG not found at {rag_path}")
-        return False
-
-    client = chromadb.PersistentClient(
-        path=str(rag_path),
-        settings=Settings(anonymized_telemetry=False),
-    )
-
-    # Log available collections
+    """Initialize ChromaDB HTTP client for a subject."""
     try:
+        client = chromadb.HttpClient(host=CHROMA_HOST, port=CHROMA_PORT)
         collections = client.list_collections()
         print(f"  Collections in {subject}: {[c.name for c in collections]}")
     except Exception as e:
-        print(f"  Error listing collections: {e}")
+        print(f"  Warning: Could not connect to ChromaDB at {CHROMA_HOST}:{CHROMA_PORT}: {e}")
+        return False
 
     rag_clients[subject] = client
     return True

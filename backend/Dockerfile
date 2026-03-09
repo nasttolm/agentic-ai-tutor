@@ -14,9 +14,10 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application
 COPY src/ ./src/
 COPY subjects.yaml .
+COPY data/adapters/ ./adapters/
 
 # Environment
-ENV DATA_DIR=/data
+ENV ADAPTERS_DIR=/app/adapters
 ENV PYTHONUNBUFFERED=1
 
 EXPOSE 8000
