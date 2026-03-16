@@ -64,7 +64,7 @@ async def lifespan(app: FastAPI):
         load_adapter(key, cfg["adapter"])
 
         logger.info("Loading RAG for %s...", key)
-        init_rag_client(key, cfg["rag"])
+        init_rag_client(key)
 
     logger.info("Ready!")
     yield
@@ -102,9 +102,12 @@ app.add_middleware(
 @app.get("/health", response_model=HealthResponse)
 def health():
     """Health check endpoint."""
+    loaded = get_loaded_subjects()
+    versions = {key: subjects[key].get("version", "unknown") for key in loaded if key in subjects}
     return HealthResponse(
         status="ok",
-        subjects_loaded=get_loaded_subjects(),
+        subjects_loaded=loaded,
+        versions=versions,
     )
 
 

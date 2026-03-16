@@ -32,7 +32,6 @@ MAX_CONTEXT_TOKENS = 1400
 
 # Generation settings
 MAX_NEW_TOKENS = 192
-TEMPERATURE = 0.1  # Lower temperature = more factual, less creative
 REPETITION_PENALTY = 1.1
 LOAD_IN_4BIT = True
 

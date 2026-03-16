@@ -34,3 +34,4 @@ class SubjectInfo(BaseModel):
 class HealthResponse(BaseModel):
     status: str
     subjects_loaded: list[str]
+    versions: dict[str, str] = {}

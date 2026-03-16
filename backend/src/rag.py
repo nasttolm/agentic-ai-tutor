@@ -22,7 +22,7 @@ def init_embedder():
     embedder = SentenceTransformer(EMBED_MODEL)
 
 
-def init_rag_client(subject: str, rag_name: str) -> bool:
+def init_rag_client(subject: str) -> bool:
     """Initialize ChromaDB HTTP client for a subject."""
     try:
         client = chromadb.HttpClient(host=CHROMA_HOST, port=CHROMA_PORT)

@@ -7,7 +7,7 @@ node_modules/
 
 # big artifacts
 data/
-adapters/
+/adapters/
 rag/**/chroma_store/
 *.safetensors
 *.bin
