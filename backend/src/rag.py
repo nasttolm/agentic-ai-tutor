@@ -1,12 +1,15 @@
 """
 RAG retrieval using ChromaDB
 """
+import logging
 import re
 
 import chromadb
 from sentence_transformers import SentenceTransformer
 
 from .config import EMBED_MODEL, TOP_K, MAX_CONTEXT_TOKENS, CHROMA_HOST, CHROMA_PORT
+
+logger = logging.getLogger(__name__)
 
 # Global embedder
 embedder: SentenceTransformer = None
@@ -24,9 +27,9 @@ def init_rag_client(subject: str, rag_name: str) -> bool:
     try:
         client = chromadb.HttpClient(host=CHROMA_HOST, port=CHROMA_PORT)
         collections = client.list_collections()
-        print(f"  Collections in {subject}: {[c.name for c in collections]}")
+        logger.info("ChromaDB [%s]: connected, collections=%s", subject, [c.name for c in collections])
     except Exception as e:
-        print(f"  Warning: Could not connect to ChromaDB at {CHROMA_HOST}:{CHROMA_PORT}: {e}")
+        logger.warning("Could not connect to ChromaDB at %s:%s: %s", CHROMA_HOST, CHROMA_PORT, e)
         return False
 
     rag_clients[subject] = client
@@ -37,19 +40,18 @@ def retrieve_chunks(subject: str, query: str, top_k: int = TOP_K) -> list[dict]:
     """Retrieve relevant chunks from ChromaDB."""
     client = rag_clients.get(subject)
     if not client or not embedder:
-        print(f"[RAG] No client or embedder for {subject}")
+        logger.warning("No RAG client or embedder for subject '%s'", subject)
         return []
 
     try:
         coll = client.get_collection("rag")
-        print(f"[RAG] Found collection 'rag' for {subject}, count: {coll.count()}")
+        logger.debug("RAG [%s]: collection 'rag' has %d documents", subject, coll.count())
     except Exception as e:
-        print(f"[RAG] Error getting collection for {subject}: {e}")
-        # Try to list available collections
+        logger.error("RAG [%s]: could not get collection: %s", subject, e)
         try:
             collections = client.list_collections()
-            print(f"[RAG] Available collections: {[c.name for c in collections]}")
-        except:
+            logger.debug("RAG [%s]: available collections: %s", subject, [c.name for c in collections])
+        except Exception:
             pass
         return []
 
@@ -64,9 +66,9 @@ def retrieve_chunks(subject: str, query: str, top_k: int = TOP_K) -> list[dict]:
     metas = res.get("metadatas", [[]])[0]
     distances = res.get("distances", [[]])[0]
 
-    print(f"[RAG] Retrieved {len(docs)} chunks for query: {query[:50]}...")
+    logger.info("RAG [%s]: retrieved %d chunks for query: %s...", subject, len(docs), query[:50])
     for i, (doc, dist) in enumerate(zip(docs[:3], distances[:3])):
-        print(f"  [{i+1}] similarity={1-dist:.3f}, preview: {doc[:80]}...")
+        logger.debug("  [%d] similarity=%.3f, preview: %s...", i + 1, 1 - dist, doc[:80])
 
     results = []
     for doc, meta in zip(docs, metas):

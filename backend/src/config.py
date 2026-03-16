@@ -1,9 +1,12 @@
 """
 Configuration and settings
 """
+import logging
 import os
 import yaml
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 # Paths
 _default_adapters = Path(__file__).parent.parent / "data" / "adapters"
@@ -54,8 +57,8 @@ def load_subjects() -> dict:
     if SUBJECT:
         if SUBJECT not in all_subjects:
             raise ValueError(f"Unknown subject: {SUBJECT}. Available: {list(all_subjects.keys())}")
-        print(f"[Config] Single-subject mode: {SUBJECT}")
+        logger.info("Single-subject mode: %s", SUBJECT)
         return {SUBJECT: all_subjects[SUBJECT]}
 
-    print(f"[Config] Multi-subject mode: {list(all_subjects.keys())}")
+    logger.info("Multi-subject mode: %s", list(all_subjects.keys()))
     return all_subjects

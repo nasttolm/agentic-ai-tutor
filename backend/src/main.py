@@ -5,13 +5,17 @@ Supports two modes:
 - Multi-subject mode (default): loads all subjects
 - Single-subject mode: set SUBJECT env var (e.g., SUBJECT=fsd)
 """
+import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 
+from . import logging_config  # noqa: F401 — configures root logger on import
 from .config import load_subjects, SUBJECT
+
+logger = logging.getLogger(__name__)
 from .schemas import (
     ChatRequest,
     ChatResponse,
@@ -43,30 +47,29 @@ async def lifespan(app: FastAPI):
     """Load models on startup, cleanup on shutdown."""
     global subjects
 
-    print("Loading subjects config...")
+    logger.info("Loading subjects config...")
     subjects = load_subjects()
 
-    print("Loading embedder...")
+    logger.info("Loading embedder...")
     init_embedder()
 
-    print("Loading tokenizer...")
+    logger.info("Loading tokenizer...")
     init_tokenizer()
 
-    print("Loading base model...")
+    logger.info("Loading base model...")
     init_base_model()
 
-    # Load adapters and RAG for each subject
     for key, cfg in subjects.items():
-        print(f"Loading adapter for {key}...")
+        logger.info("Loading adapter for %s...", key)
         load_adapter(key, cfg["adapter"])
 
-        print(f"Loading RAG for {key}...")
+        logger.info("Loading RAG for %s...", key)
         init_rag_client(key, cfg["rag"])
 
-    print("Ready!")
+    logger.info("Ready!")
     yield
 
-    print("Shutting down...")
+    logger.info("Shutting down...")
 
 
 # FastAPI app

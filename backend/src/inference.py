@@ -1,6 +1,7 @@
 """
 LoRA model inference
 """
+import logging
 import time
 import torch
 from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig
@@ -14,6 +15,8 @@ from .config import (
     LOAD_IN_4BIT,
     SYSTEM_PROMPT,
 )
+
+logger = logging.getLogger(__name__)
 
 # Stop markers to strip from generated output
 STOP_MARKERS = ["<|im_end|>", "<|im_start|>", "<reponame>", "<gh_stars>"]
@@ -52,9 +55,9 @@ def init_base_model():
                 bnb_4bit_compute_dtype=torch.float16,
             )
             load_kwargs["quantization_config"] = bnb_config
-            print("[Inference] Loading model with 4-bit quantization")
+            logger.info("Loading model with 4-bit quantization")
         except Exception as e:
-            print(f"[Inference] 4-bit quantization unavailable ({e}), falling back to fp16")
+            logger.warning("4-bit quantization unavailable (%s), falling back to fp16", e)
             load_kwargs["torch_dtype"] = torch.float16
     else:
         load_kwargs["torch_dtype"] = torch.float16
@@ -71,7 +74,7 @@ def load_adapter(subject: str, adapter_name: str) -> bool:
     adapter_path = ADAPTERS_DIR / adapter_name
 
     if not adapter_path.exists():
-        print(f"  Warning: adapter not found at {adapter_path}")
+        logger.warning("Adapter not found at %s, falling back to base model", adapter_path)
         models[subject] = base_model  # fallback
         return False
 
@@ -146,7 +149,7 @@ def generate_response(
     response = _clean_response(response)
 
     elapsed = time.time() - start_time
-    print(f"[Inference] {subject}: {elapsed:.2f}s")
+    logger.info("Inference [%s]: %.2fs, %d tokens", subject, elapsed, output.shape[1] - input_ids.shape[1])
 
     return response
 
