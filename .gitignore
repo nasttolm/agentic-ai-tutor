@@ -5,11 +5,12 @@ __pycache__/
 venv/
 node_modules/
 
-# big artifacts
-data/
+# big artifacts — adapters tracked via Git LFS (see .gitattributes)
+backend/data/rag/
+backend/data/metrics_outputs/
+backend/data/eval_qa/
 /adapters/
 rag/**/chroma_store/
-*.safetensors
 *.bin
 
 # plans / drafts
