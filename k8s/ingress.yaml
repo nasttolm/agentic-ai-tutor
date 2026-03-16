@@ -7,7 +7,6 @@ metadata:
     app: ai-tutor
   annotations:
     # For AWS ALB Ingress Controller
-    kubernetes.io/ingress.class: alb
     alb.ingress.kubernetes.io/scheme: internet-facing
     alb.ingress.kubernetes.io/target-type: ip
     # For NGINX Ingress Controller (alternative)

@@ -20,7 +20,7 @@ spec:
     spec:
       containers:
         - name: fcs-service
-          image: ghcr.io/your-username/ai-tutor-backend:latest
+          image: ghcr.io/nasttolm/ai-tutor-backend:latest
           ports:
             - containerPort: 8000
           env:

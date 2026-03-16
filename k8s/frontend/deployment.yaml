@@ -20,7 +20,7 @@ spec:
     spec:
       containers:
         - name: frontend
-          image: ghcr.io/your-username/ai-tutor-frontend:latest
+          image: ghcr.io/nasttolm/ai-tutor-frontend:latest
           ports:
             - containerPort: 3000
           env:

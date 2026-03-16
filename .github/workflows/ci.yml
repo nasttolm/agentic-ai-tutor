@@ -1,0 +1,82 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: nasttolm/ai-tutor-backend
+
+jobs:
+  lint:
+    name: Syntax check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Check Python syntax
+        run: |
+          python -m py_compile backend/src/config.py
+          python -m py_compile backend/src/rag.py
+          python -m py_compile backend/src/inference.py
+          python -m py_compile backend/src/main.py
+          python -m py_compile backend/src/schemas.py
+          python -m py_compile backend/src/logging_config.py
+
+      - name: Validate k8s manifests (dry-run)
+        uses: azure/k8s-lint@v2
+        with:
+          manifests: |
+            k8s/namespace.yaml
+            k8s/storage.yaml
+            k8s/fsd/deployment.yaml
+            k8s/fcs/deployment.yaml
+            k8s/dma/deployment.yaml
+            k8s/ingress.yaml
+
+  build:
+    name: Build and push image
+    runs-on: ubuntu-latest
+    needs: lint
+    if: github.event_name == 'push'
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=sha,prefix=
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

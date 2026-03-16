@@ -35,7 +35,7 @@ labels:
 
 # Image customization (override in overlays)
 images:
-  - name: ghcr.io/your-username/ai-tutor-backend
+  - name: ghcr.io/nasttolm/ai-tutor-backend
     newTag: latest
-  - name: ghcr.io/your-username/ai-tutor-frontend
+  - name: ghcr.io/nasttolm/ai-tutor-frontend
     newTag: latest
