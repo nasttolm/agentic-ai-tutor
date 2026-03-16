@@ -1,0 +1,18 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: ai-tutor
+  namespace: argocd
+spec:
+  description: AI Tutor microservices project
+
+  sourceRepos:
+    - https://github.com/nasttolm/agentic-ai-tutor.git
+
+  destinations:
+    - namespace: ai-tutor
+      server: https://kubernetes.default.svc
+
+  clusterResourceWhitelist:
+    - group: ""
+      kind: Namespace

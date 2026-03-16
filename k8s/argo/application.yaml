@@ -1,0 +1,24 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: ai-tutor
+  namespace: argocd
+spec:
+  project: default
+
+  source:
+    repoURL: https://github.com/nasttolm/agentic-ai-tutor.git
+    targetRevision: main
+    path: k8s
+    kustomize: {}
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: ai-tutor
+
+  syncPolicy:
+    automated:
+      prune: true       # remove resources deleted from git
+      selfHeal: true    # revert manual changes in cluster
+    syncOptions:
+      - CreateNamespace=true
