@@ -11,6 +11,12 @@ RUN apt-get update && apt-get install -y \
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Install torchvision from PyTorch CUDA wheels to match conda torch in base image
+RUN pip install --no-cache-dir \
+    "torchvision==0.17.0" \
+    --index-url https://download.pytorch.org/whl/cu121 \
+    --extra-index-url https://pypi.org/simple
+
 # Copy application
 COPY src/ ./src/
 COPY subjects.yaml .

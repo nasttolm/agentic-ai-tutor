@@ -21,6 +21,7 @@ spec:
       containers:
         - name: fcs-service
           image: ghcr.io/nasttolm/ai-tutor-backend:latest
+          imagePullPolicy: Never
           ports:
             - containerPort: 8000
           env:
@@ -34,26 +35,18 @@ spec:
             requests:
               memory: "4Gi"
               cpu: "1"
-              nvidia.com/gpu: "1"
             limits:
               memory: "12Gi"
               cpu: "4"
-              nvidia.com/gpu: "1"
           readinessProbe:
             httpGet:
               path: /health
               port: 8000
-            initialDelaySeconds: 60
+            initialDelaySeconds: 300
             periodSeconds: 10
           livenessProbe:
             httpGet:
               path: /health
               port: 8000
-            initialDelaySeconds: 120
+            initialDelaySeconds: 600
             periodSeconds: 30
-      nodeSelector:
-        nvidia.com/gpu: "true"
-      tolerations:
-        - key: "nvidia.com/gpu"
-          operator: "Exists"
-          effect: "NoSchedule"

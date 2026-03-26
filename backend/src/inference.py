@@ -39,28 +39,29 @@ def init_tokenizer():
 
 
 def init_base_model():
-    """Initialize base model (4-bit quantized if available, else fp16)."""
+    """Initialize base model (4-bit quantized if GPU available, else fp32 on CPU)."""
     global base_model
 
+    cuda_available = torch.cuda.is_available()
     load_kwargs = {
         "device_map": "auto",
         "trust_remote_code": True,
         "attn_implementation": "eager",
     }
 
-    if LOAD_IN_4BIT:
-        try:
-            bnb_config = BitsAndBytesConfig(
-                load_in_4bit=True,
-                bnb_4bit_compute_dtype=torch.float16,
-            )
-            load_kwargs["quantization_config"] = bnb_config
-            logger.info("Loading model with 4-bit quantization")
-        except Exception as e:
-            logger.warning("4-bit quantization unavailable (%s), falling back to fp16", e)
-            load_kwargs["torch_dtype"] = torch.float16
-    else:
+    if LOAD_IN_4BIT and cuda_available:
+        bnb_config = BitsAndBytesConfig(
+            load_in_4bit=True,
+            bnb_4bit_compute_dtype=torch.float16,
+        )
+        load_kwargs["quantization_config"] = bnb_config
+        logger.info("Loading model with 4-bit quantization (GPU)")
+    elif cuda_available:
         load_kwargs["torch_dtype"] = torch.float16
+        logger.info("Loading model in fp16 (GPU)")
+    else:
+        load_kwargs["torch_dtype"] = torch.bfloat16
+        logger.warning("No GPU available — loading model in bfloat16 on CPU (slow)")
 
     base_model = AutoModelForCausalLM.from_pretrained(
         BASE_MODEL,
