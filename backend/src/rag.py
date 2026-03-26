@@ -7,7 +7,7 @@ import re
 import chromadb
 from sentence_transformers import SentenceTransformer
 
-from .config import EMBED_MODEL, TOP_K, MAX_CONTEXT_TOKENS, CHROMA_HOST, CHROMA_PORT
+from .config import EMBED_MODEL, TOP_K, MAX_CONTEXT_TOKENS, CHROMA_HOST, CHROMA_PORT, CHROMA_DATA_PATH
 
 logger = logging.getLogger(__name__)
 
@@ -23,13 +23,24 @@ def init_embedder():
 
 
 def init_rag_client(subject: str) -> bool:
-    """Initialize ChromaDB HTTP client for a subject."""
+    """Initialize ChromaDB client for a subject.
+
+    Uses PersistentClient when CHROMA_DATA_PATH is set (local dev),
+    otherwise HttpClient (Docker/k8s).
+    """
     try:
-        client = chromadb.HttpClient(host=CHROMA_HOST, port=CHROMA_PORT)
-        collections = client.list_collections()
-        logger.info("ChromaDB [%s]: connected, collections=%s", subject, [c.name for c in collections])
+        if CHROMA_DATA_PATH:
+            from pathlib import Path
+            path = Path(CHROMA_DATA_PATH) / subject / "chroma_store"
+            client = chromadb.PersistentClient(path=str(path))
+            collections = client.list_collections()
+            logger.info("ChromaDB [%s]: PersistentClient at %s, collections=%s", subject, path, [c.name for c in collections])
+        else:
+            client = chromadb.HttpClient(host=CHROMA_HOST, port=CHROMA_PORT)
+            collections = client.list_collections()
+            logger.info("ChromaDB [%s]: HttpClient %s:%s, collections=%s", subject, CHROMA_HOST, CHROMA_PORT, [c.name for c in collections])
     except Exception as e:
-        logger.warning("Could not connect to ChromaDB at %s:%s: %s", CHROMA_HOST, CHROMA_PORT, e)
+        logger.warning("Could not initialise ChromaDB for %s: %s", subject, e)
         return False
 
     rag_clients[subject] = client
@@ -71,24 +82,27 @@ def retrieve_chunks(subject: str, query: str, top_k: int = TOP_K) -> list[dict]:
         logger.debug("  [%d] similarity=%.3f, preview: %s...", i + 1, 1 - dist, doc[:80])
 
     results = []
-    for doc, meta in zip(docs, metas):
+    seen_texts: set[str] = set()
+    for doc, meta, dist in zip(docs, metas, distances):
+        # Deduplicate by text content
+        if doc in seen_texts:
+            continue
+        seen_texts.add(doc)
+
         # Extract file names from source_files metadata
         source_files = meta.get("source_files", "")
         file_name = meta.get("topic_id", "unknown")
 
         if source_files:
             try:
-                # Extract file names with extensions (handles malformed JSON)
                 matches = re.findall(r"(Topic_[^,]+\.(?:pdf|docx|pptx))", source_files, re.IGNORECASE)
                 if matches:
-                    # Get unique file names, take first 2
                     unique_files = list(dict.fromkeys(matches))[:2]
                     file_name = ", ".join(unique_files)
             except Exception:
                 pass
 
-        similarity = 1 - distances[len(results)]  # Convert distance to similarity
-        results.append({"text": doc, "file": file_name, "similarity": similarity})
+        results.append({"text": doc, "file": file_name, "similarity": 1 - dist})
     return results
 
 

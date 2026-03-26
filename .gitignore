@@ -13,6 +13,10 @@ backend/data/eval_qa/
 rag/**/chroma_store/
 *.bin
 
+# Piper TTS models (download via download_piper_model.py)
+backend/data/piper/*.onnx
+backend/data/piper/*.onnx.json
+
 # plans / drafts
 DEVELOPMENT_PLAN.md
 

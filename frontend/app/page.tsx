@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { api, Message, Subject } from '@/lib/api';
 import { ChatMessage, LoadingMessage, SubjectTabs, ChatInput } from './components';
 
@@ -15,6 +15,17 @@ export default function Home() {
   const [activeTab, setActiveTab] = useState<string>('');
   const [tabStates, setTabStates] = useState<Record<string, TabState>>({});
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // TTS state
+  const [ttsEnabled, setTtsEnabled] = useState(false);
+  const [playingIndex, setPlayingIndex] = useState<number | null>(null);
+  const [loadingAudioIndex, setLoadingAudioIndex] = useState<number | null>(null);
+  const currentAudioRef = useRef<HTMLAudioElement | null>(null);
+
+  // Load TTS preference from localStorage (client-side only)
+  useEffect(() => {
+    setTtsEnabled(localStorage.getItem('ttsEnabled') === 'true');
+  }, []);
 
   useEffect(() => {
     api.getSubjects().then((data) => {
@@ -40,6 +51,54 @@ export default function Home() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [currentState.messages, currentState.loading]);
+
+  const stopCurrentAudio = useCallback(() => {
+    if (currentAudioRef.current) {
+      currentAudioRef.current.pause();
+      currentAudioRef.current = null;
+    }
+    setPlayingIndex(null);
+    setLoadingAudioIndex(null);
+  }, []);
+
+  const playAudio = useCallback(async (text: string, subject: string, index: number) => {
+    // Toggle off if already playing this message
+    if (playingIndex === index) {
+      stopCurrentAudio();
+      return;
+    }
+    stopCurrentAudio();
+    setLoadingAudioIndex(index);
+    try {
+      const blob = await api.tts(text, subject);
+      const url = URL.createObjectURL(blob);
+      const audio = new Audio(url);
+      currentAudioRef.current = audio;
+      setLoadingAudioIndex(null);
+      setPlayingIndex(index);
+      audio.onended = () => {
+        setPlayingIndex(null);
+        URL.revokeObjectURL(url);
+        currentAudioRef.current = null;
+      };
+      audio.play();
+    } catch {
+      setLoadingAudioIndex(null);
+      setPlayingIndex(null);
+    }
+  }, [playingIndex, stopCurrentAudio]);
+
+  const toggleTts = () => {
+    const next = !ttsEnabled;
+    setTtsEnabled(next);
+    localStorage.setItem('ttsEnabled', String(next));
+    if (!next) stopCurrentAudio();
+  };
+
+  const handleTabChange = (tabId: string) => {
+    stopCurrentAudio();
+    setActiveTab(tabId);
+  };
 
   const updateTabState = (subjectId: string, updates: Partial<TabState>) => {
     setTabStates((prev) => ({
@@ -74,10 +133,15 @@ export default function Home() {
         sources: response.sources,
       };
 
+      const updatedMessages = [...newMessages, assistantMessage];
       updateTabState(activeTab, {
-        messages: [...newMessages, assistantMessage],
+        messages: updatedMessages,
         loading: false,
       });
+
+      if (ttsEnabled) {
+        playAudio(response.answer, activeTab, newMessages.length);
+      }
     } catch (error) {
       console.error('Chat error:', error);
       const errorMessage: Message = {
@@ -97,7 +161,7 @@ export default function Home() {
       <SubjectTabs
         subjects={subjects}
         activeTab={activeTab}
-        onTabChange={setActiveTab}
+        onTabChange={handleTabChange}
       />
 
       {/* Chat Messages */}
@@ -112,7 +176,17 @@ export default function Home() {
           ) : (
             <div className="space-y-8">
               {currentState.messages.map((message, index) => (
-                <ChatMessage key={index} message={message} />
+                <ChatMessage
+                  key={index}
+                  message={message}
+                  isPlaying={playingIndex === index}
+                  isLoadingAudio={loadingAudioIndex === index}
+                  onPlayAudio={
+                    message.role === 'assistant'
+                      ? () => playAudio(message.content, activeTab, index)
+                      : undefined
+                  }
+                />
               ))}
               {currentState.loading && <LoadingMessage />}
               <div ref={messagesEndRef} />
@@ -128,6 +202,8 @@ export default function Home() {
         onChange={(value) => updateTabState(activeTab, { input: value })}
         onSend={handleSend}
         disabled={currentState.loading}
+        ttsEnabled={ttsEnabled}
+        onToggleTts={toggleTts}
       />
     </div>
   );

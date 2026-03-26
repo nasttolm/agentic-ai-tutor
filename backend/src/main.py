@@ -10,7 +10,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
+from fastapi.responses import Response, StreamingResponse
 
 from . import logging_config  # noqa: F401 — configures root logger on import
 from .config import load_subjects, SUBJECT
@@ -22,7 +22,9 @@ from .schemas import (
     SubjectInfo,
     HealthResponse,
     Source,
+    TTSRequest,
 )
+from .tts import init_tts, is_tts_available, synthesize
 from .rag import (
     init_embedder,
     init_rag_client,
@@ -66,6 +68,9 @@ async def lifespan(app: FastAPI):
         logger.info("Loading RAG for %s...", key)
         init_rag_client(key)
 
+    logger.info("Initialising TTS...")
+    init_tts()
+
     logger.info("Ready!")
     yield
 
@@ -108,6 +113,7 @@ def health():
         status="ok",
         subjects_loaded=loaded,
         versions=versions,
+        tts_available=is_tts_available(),
     )
 
 
@@ -167,6 +173,24 @@ def chat_stream(req: ChatRequest):
             yield token
 
     return StreamingResponse(generate(), media_type="text/plain")
+
+
+@app.post("/api/tts")
+def text_to_speech(req: TTSRequest):
+    """Convert text to speech. Returns audio/wav binary.
+
+    Returns 503 when TTS is unavailable (model not loaded or TTS_ENABLED=false).
+    """
+    if not is_tts_available():
+        raise HTTPException(status_code=503, detail="TTS not available")
+
+    try:
+        audio_bytes = synthesize(req.text)
+    except Exception as exc:
+        logger.error("TTS synthesis failed: %s", exc)
+        raise HTTPException(status_code=500, detail="TTS synthesis failed") from exc
+
+    return Response(content=audio_bytes, media_type="audio/wav")
 
 
 # -----------------------------------------------------------------------------

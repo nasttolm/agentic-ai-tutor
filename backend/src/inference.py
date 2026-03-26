@@ -12,6 +12,7 @@ from .config import (
     ADAPTERS_DIR,
     MAX_NEW_TOKENS,
     REPETITION_PENALTY,
+    NO_REPEAT_NGRAM_SIZE,
     LOAD_IN_4BIT,
     SYSTEM_PROMPT,
 )
@@ -95,13 +96,11 @@ def _clean_response(text: str) -> str:
 
 def _build_messages(question: str, history: list[dict], context: str) -> list[dict]:
     """Build chat messages for the model."""
-    messages = [{"role": "system", "content": SYSTEM_PROMPT}]
-
+    system_content = SYSTEM_PROMPT
     if context.strip():
-        messages.append({
-            "role": "system",
-            "content": f"Course materials:\n{context}"
-        })
+        system_content += f"\n\nCourse materials:\n{context}"
+
+    messages = [{"role": "system", "content": system_content}]
 
     for msg in history[-10:]:
         messages.append({"role": msg["role"], "content": msg["content"]})
@@ -122,6 +121,12 @@ def generate_response(
         raise ValueError(f"Model for subject '{subject}' not loaded")
 
     messages = _build_messages(question, history, context)
+    logger.info(
+        "Inference [%s]: context_chunks=%d, context_chars=%d",
+        subject,
+        context.count("---") + 1 if context.strip() else 0,
+        len(context),
+    )
     start_time = time.time()
 
     # Tokenize
@@ -139,6 +144,7 @@ def generate_response(
             max_new_tokens=MAX_NEW_TOKENS,
             do_sample=False,
             repetition_penalty=REPETITION_PENALTY,
+            no_repeat_ngram_size=NO_REPEAT_NGRAM_SIZE,
             pad_token_id=tokenizer.eos_token_id,
         )
 
@@ -197,6 +203,7 @@ def generate_response_stream(
         "max_new_tokens": MAX_NEW_TOKENS,
         "do_sample": False,
         "repetition_penalty": REPETITION_PENALTY,
+        "no_repeat_ngram_size": NO_REPEAT_NGRAM_SIZE,
         "pad_token_id": tokenizer.eos_token_id,
         "streamer": streamer,
     }

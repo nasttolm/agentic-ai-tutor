@@ -16,3 +16,6 @@ bitsandbytes==0.43.3
 # RAG
 chromadb>=0.5.0
 sentence-transformers>=3.0.0
+
+# TTS (optional — requires voice model, see download_piper_model.py)
+piper-tts>=1.2.0

@@ -29,6 +29,7 @@ jobs:
           python -m py_compile backend/src/main.py
           python -m py_compile backend/src/schemas.py
           python -m py_compile backend/src/logging_config.py
+          python -m py_compile backend/src/tts.py
 
       - name: Validate k8s manifests (dry-run)
         uses: azure/k8s-lint@v2

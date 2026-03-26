@@ -1,13 +1,17 @@
 'use client';
 
+import { SpeakerWaveIcon, SpeakerXMarkIcon } from '@heroicons/react/24/solid';
+
 interface ChatInputProps {
   value: string;
   onChange: (value: string) => void;
   onSend: () => void;
   disabled: boolean;
+  ttsEnabled: boolean;
+  onToggleTts: () => void;
 }
 
-export function ChatInput({ value, onChange, onSend, disabled }: ChatInputProps) {
+export function ChatInput({ value, onChange, onSend, disabled, ttsEnabled, onToggleTts }: ChatInputProps) {
   return (
     <div className="px-6 py-4">
       <div className="max-w-3xl mx-auto">
@@ -21,6 +25,20 @@ export function ChatInput({ value, onChange, onSend, disabled }: ChatInputProps)
             disabled={disabled}
             className="flex-1 bg-transparent px-5 py-4 focus:outline-none placeholder-gray-400 disabled:opacity-50"
           />
+          <button
+            onClick={onToggleTts}
+            title={ttsEnabled ? 'Auto-play ON' : 'Auto-play OFF'}
+            className={`mr-1 p-2 rounded-xl transition-colors ${
+              ttsEnabled
+                ? 'text-violet-600 hover:bg-violet-100'
+                : 'text-gray-400 hover:bg-gray-200'
+            }`}
+          >
+            {ttsEnabled
+              ? <SpeakerWaveIcon className="w-5 h-5" />
+              : <SpeakerXMarkIcon className="w-5 h-5" />
+            }
+          </button>
           <button
             onClick={onSend}
             disabled={disabled || !value.trim()}
