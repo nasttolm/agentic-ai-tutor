@@ -1,0 +1,49 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ai-tutor-ingress
+  namespace: ai-tutor
+  labels:
+    app: ai-tutor
+  annotations:
+    # For AWS ALB Ingress Controller
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    # For NGINX Ingress Controller (alternative)
+    # kubernetes.io/ingress.class: nginx
+    # nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+spec:
+  rules:
+    - host: ai-tutor.example.com  # Replace with your domain
+      http:
+        paths:
+          # Frontend (default)
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: frontend
+                port:
+                  number: 80
+          # API routes to subject-specific services
+          - path: /api/fsd
+            pathType: Prefix
+            backend:
+              service:
+                name: fsd-service
+                port:
+                  number: 80
+          - path: /api/fcs
+            pathType: Prefix
+            backend:
+              service:
+                name: fcs-service
+                port:
+                  number: 80
+          - path: /api/dma
+            pathType: Prefix
+            backend:
+              service:
+                name: dma-service
+                port:
+                  number: 80

@@ -1,0 +1,345 @@
+\chapter{Technical Review}
+\label{chap:technical_review}
+
+\section{Overview}
+
+This chapter provides a review of the technical foundations, design choices, and supporting infrastructure behind the proposed Agentic AI Tutor system. It evaluates alternative models, fine-tuning strategies, and MLOps components with respect to accuracy, efficiency, scalability, and educational applicability.
+
+\section{Model Selection}
+
+\subsection{Requirements}
+
+The selection of a suitable base model was guided by four key criteria ensuring feasibility, openness, relevance, and sustainability. These requirements were defined according to the computational constraints and ethical standards of educational environments.
+
+\begin{enumerate}
+    \item \textbf{Computational feasibility}  
+    The model must support fine-tuning and inference within limited computational resources. A typical setup for this project includes a mid-range version of current NVIDIA GPU such as the NVIDIA RTX 5070  that provides 12 GB of VRAM, or equivalent resources available through Google Colab. Therefore, the selected model should be trainable or fine-tunable within this capacity without requiring distributed infrastructure.
+    
+    \item \textbf{Open-source accessibility}  
+    The model must be open-source and distributed under a permissive license such as MIT. This ensures full transparency, reproducibility, and the absence of legal or commercial restrictions. That are essential factors for deployment and further research in academic institutions.
+    
+    \item \textbf{Domain relevance}  
+    The model should demonstrate strong performance in tasks relevant to the chosen application domain. In this case, educational tutoring and reasoning support. Preference is given to models optimised for instruction-following, contextual understanding, and factual accuracy.
+    
+    \item \textbf{Environmental sustainability}  
+    The model should minimise its environmental impact, particularly in terms of energy consumption and CO\textsubscript{2} emissions during training and inference. Lower energy requirements make the solution more sustainable and accessible for small-scale academic projects.
+\end{enumerate}
+
+The model selection process was guided by the four requirements defined above. To ensure computational feasibility, only open-weight Small Language Models (SLMs) with fewer than 7 billion parameters were considered. This threshold aligns with findings by \textcite{vSmallLan73:online}, who demonstrated that SLMs under 7B parameters offer significantly higher inference efficiency. They are 10-30 times cheaper in latency, FLOPs, and energy consumption compared to 70-175B LLMs, while maintaining strong reasoning performance. Such models can be efficiently fine-tuned and executed on mid-range GPUs such as the NVIDIA RTX 5070  (12 GB VRAM) or equivalent Google Colab configurations, eliminating the need for distributed or multi-GPU infrastructure. To evaluate candidate models, benchmark data were obtained from the Hugging Face Open LLM Leaderboard (Archived) \parencite{HuggingFaceLeaderboard2025}. This leaderboard ranks open-weight models according to standard evaluation metrics including IFEval, MMLU-Pro, and Average. These benchmarks were selected because they closely correspond to key tutoring competencies. IFEval measures instruction-following and conversational coherence-crucial for generating context-aware responses to student prompts and MMLU-Pro assesses reasoning and problem-solving across academic domains, reflecting the model’s ability to support learning tasks in science, mathematics, and general knowledge. The Average score provides an aggregate indicator of overall performance across diverse skills. Additionally, the leaderboard reports estimated CO\textsubscript{2} emissions, enabling a comparison of each model’s environmental footprint during inference and training.
+
+\subsection{Phi-4-mini-instruct}
+Phi-4-mini-instruct is a lightweight open-weight Small Language Model (3.8B parameters) developed by Microsoft. It supports a long 128K token context and was trained on 5T tokens of synthetic “textbook-like” and filtered educational data \parencite{microsof61:online,Empoweri69:online}. The model underwent supervised fine-tuning and Direct Preference Optimization (DPO) to improve instruction adherence and safety alignment. Its architecture includes grouped-query attention and gated feed-forward networks for latency reduction. Designed for reasoning, code, and math tasks in compute-constrained environments, it achieves high MMLU-Pro accuracy \(\approx 52.8\)\% with minimal energy use (0.83 kg CO\textsubscript{2}). Licensed under MIT, it is suitable for educational and research deployment with RAG augmentation for factual accuracy \parencite{microsof61:online}.
+
+\subsection{Phi-3.5-mini-instruct}
+Phi-3.5-mini-instruct is the previous generation of Microsoft’s compact reasoning models (3.8B parameters) with 128K context length. It was trained on 3.4T tokens combining synthetic reasoning data and high-quality filtered web sources. Post-training techniques include Proximal Policy Optimization (PPO) and DPO for improved multilingual and reasoning performance. It performs strongly on multilingual and code-related benchmarks but has higher energy requirements \(\approx 7\)kg CO\textsubscript{2} compared to Phi-4. Also released under the MIT license, it remains an effective model for general instruction-following and STEM education \parencite{microsof85:online}.
+
+\subsection{Dolphin-2.9.2-Phi-3-Medium}
+Dolphin-2.9.2-Phi-3-Medium is a community fine-tuned version of Microsoft’s Phi-3-Medium \(\approx 3.8\)B parameters, trained using qLoRA on instruction and conversational datasets (e.g., OpenHermes, CodeFeedback, Orca-Math). The model demonstrates good fluency and initial agentic capabilities such as function calling, but lacks full safety post-training. It is suitable for experimentation and rapid prototyping but requires an external alignment or moderation layer before public deployment. It inherits the MIT license from its base model \parencite{dphndolp16:online}.
+
+\subsection{Qwen2.5-3B-Instruct}
+Qwen2.5-3B-Instruct is an instruction-tuned model from Alibaba’s Qwen2.5 series (3B parameters), supporting up to 32K context (generation up to 8K). It was trained on multilingual and domain-specialised data with strong emphasis on coding, mathematics, and structured JSON output generation. The model supports 29 languages and features advanced role-prompting and long-context understanding. While highly capable for multilingual and structured tasks, it shows lower English accuracy than Phi-4 and uses the more restrictive Qwen-Research license, limiting its redistribution for educational research \parencite{QwenQwen78:online}.
+
+\subsection{Comparison of SLMs}
+
+\begin{table}[h]
+\centering
+\caption{Comparison of Small Language Models \parencite{HuggingFaceLeaderboard2025}}
+\label{tab:leaderboard-comparison}
+\setlength{\tabcolsep}{4pt}
+\renewcommand{\arraystretch}{1.1}
+\small
+\begin{tabularx}{\linewidth}{
+  >{\raggedright\arraybackslash}p{0.32\linewidth}
+  >{\centering\arraybackslash}p{0.12\linewidth}
+  >{\centering\arraybackslash}p{0.12\linewidth}
+  >{\centering\arraybackslash}p{0.12\linewidth}
+  >{\centering\arraybackslash}p{0.12\linewidth}
+  >{\centering\arraybackslash}p{0.12\linewidth}}
+\toprule
+\textbf{Model} & \textbf{Params (B)} & \textbf{Average (\%)} & \textbf{IFEval (\%)} & \textbf{MMLU-Pro (\%)} & \textbf{CO\textsubscript{2} (kg)}\\
+\midrule
+\textbf{\nolinkurl{microsoft/Phi-4-mini-instruct}} & 4.2 & \textbf{29.41} & 73.78 & \textbf{32.58} & \textbf{0.83}\\
+\nolinkurl{cognitivecomputations/dolphin-2.9.2-Phi-3-Medium} & 3.8 & 28.61 & 42.48 & 39.50 & 1.68\\
+\nolinkurl{microsoft/Phi-3.5-mini-instruct} & 3.8 & 28.18 & 57.75 & 32.91 & 7.39\\
+\nolinkurl{microsoft/Phi-3-mini-4k-instruct} & 3.8 & 27.56 & 54.77 & 33.58 & 1.57\\
+\nolinkurl{Qwen/Qwen2.5-3B-Instruct} & 3.0 & 27.16 & 64.75 & 25.05 & 2.78\\
+\bottomrule
+\end{tabularx}
+\end{table}
+\FloatBarrier
+
+
+All models were compared under the same benchmarks provided by the Hugging Face Open LLM Leaderboard \parencite{HuggingFaceLeaderboard2025}. Evaluation metrics included:
+\begin{itemize}
+\item \textbf{MMLU-Pro:} general reasoning and academic problem solving,
+\item \textbf{IFEval:} instruction-following and dialogue quality,
+\item \textbf{Average:} overall performance across diverse tasks.
+\end{itemize}
+
+\subsection{Model Selection Rationale}
+
+After reviewing the benchmark data and official technical reports, Phi-4-mini-instruct was selected as the foundation model for the Agentic AI Tutor. Although Dolphin-2.9.2-Phi-3-Medium shows a slightly higher MMLU-Pro score (39.5\%), Phi-4-mini-instruct achieves the best overall balance of reasoning accuracy, instruction-following quality, and energy efficiency \parencite{HuggingFaceLeaderboard2025,microsof61:online}.
+
+It ranks first in Average score (29.41\%) and IFEval (73.78\%), indicating strong generalisation and dialogue precision while maintaining the lowest environmental cost (0.83 kg CO\textsubscript{2}). By contrast, Phi-3.5-mini-instruct consumes almost nine times more energy (7.39 kg CO\textsubscript{2}), and Qwen2.5-3B has weaker reasoning performance (25.05\% MMLU-Pro) \parencite{HuggingFaceLeaderboard2025}.
+
+Phi-4’s use of reasoning-dense, “textbook-like” synthetic data makes it well suited for academic tutoring tasks, where factual reliability and contextual grounding via RAG are critical. Its MIT license further supports transparent fine-tuning and on-premise deployment within university infrastructure \parencite{microsof61:online,Empoweri69:online}.
+
+Therefore, Phi-4-mini-instruct was selected as the optimal trade-off between accuracy, interpretability, efficiency, and open educational applicability.
+
+\section{Fine-Tuning Selection}
+
+\subsection{Requirements}
+
+The fine-tuning method must satisfy several practical and methodological criteria to ensure efficient adaptation of the selected SLM within limited hardware resources.
+
+\begin{enumerate}
+    \item \textbf{Computational feasibility}  
+    The fine-tuning technique must operate on a single mid-range GPU with 12GB VRAM.
+
+    \item \textbf{Parameter efficiency}  
+    Only a small proportion of the model’s parameters should be trainable, reducing computational cost and energy consumption. Parameter-efficient fine-tuning (PEFT) methods are prioritised for their compact adapter design.
+
+    \item \textbf{Domain performance and stability}  
+    The method should reliably improve model performance on tutoring-related tasks such as reasoning and instruction following.
+
+    \item \textbf{Implementation simplicity and compatibility}  
+    The method must be easily implementable using open-source frameworks and compatible with the chosen base model, Phi-4-mini-instruct.
+
+    \item \textbf{Energy and environmental efficiency}  
+    The fine-tuning approach should minimise total energy usage and CO\textsubscript{2} emissions, supporting sustainable experimentation on university hardware.
+\end{enumerate}
+
+Fine-tuning plays a central role in adapting SLMs to specific domains and educational contexts. Given the limited computational resources available (single GPU, 12 GB VRAM), the fine-tuning strategy prioritises parameter-efficient methods that balance performance with memory and energy efficiency. The evaluation considered LoRA, QLoRA, DoRA, and QDoRA techniques \parencite{FineTuni58:online}, as well as domain-specific approaches used in edge-AI models such as the Shakti series \parencite{FineTuni97:online}.
+
+\subsection{Full Fine-Tuning}
+
+Full fine-tuning updates all parameters of the base model. This gives maximum flexibility for adaptation, but it is very parameter-inefficient when there are many tasks, because each task needs its own full copy of the model. \parencite{pmlr-v97-houlsby19a}. In this project, full fine-tuning is not practical. A 3.8B parameter model is too large to fully fine-tune for each subject on a single 12 GB GPU. It would also require storing a separate full model for every subject, which is too expensive in terms of memory, energy, and maintenance. Therefore, full fine-tuning was rejected in favour of parameter-efficient methods.
+
+
+\subsection{Low-Rank Adaptation}
+
+Introduces low-rank trainable adapters into attention/MLP weight matrices, updating only a tiny fraction of parameters and freezing the base model. Strong baseline for speed, stability, and simplicity on commodity GPUs \parencite{FineTuni58:online,2106096835:online}.
+
+LoRA modifies less than one percent of a model’s parameters by introducing trainable low-rank matrices into selected attention and MLP layers, while keeping the base model frozen. This approach results in a highly efficient fine-tuning method that can be implemented easily through the Hugging Face PEFT library \parencite{FineTuni58:online}. In large-scale Encora trials, LoRA consistently demonstrated the fastest and most cost-effective performance, particularly on A100-class GPUs, while remaining competitive on smaller devices. Its stability across various batch sizes and sequence lengths makes it the most practical default option for research environments with limited hardware capacity (12GB VRAM) \parencite{FineTuni58:online}.
+
+\subsection{Quantized LoRA}
+
+Combines low-rank adapters with 4-bit (or 8-bit) base-model quantization to reduce memory, enabling larger bases on smaller GPUs. Adds quantization/dequantization overhead that may affect speed and sometimes memory \parencite{FineTuni58:online, QLoRAEff12:online}. On a 12 GB GPU, the extra quantization and dequantization steps can slow down training and make the implementation more complex, while the memory savings are not strictly necessary for a 3.8B parameter model.
+
+
+\subsection{Weight-Decomposed LoRA}
+
+Decomposes weights into magnitude and direction to improve adaptation capacity over LoRA at similar parameter counts; may increase training/evaluation time \parencite{FineTuni58:online}.
+
+DoRA refines the LoRA concept by decomposing each weight matrix into two independent components: magnitude and direction. This decomposition allows finer control during training and can improve model generalisation and accuracy, especially in domain-specific applications. However, the additional decomposition layer introduces a moderate increase in computational complexity, making training and evaluation slower compared to LoRA and QLoRA. Consequently, DoRA is best suited for high-quality fine-tuning experiments where extended training time is acceptable \parencite{FineTuni58:online}. The extra computation and longer training time are not ideal for a small academic project that needs fast and simple experimental cycles.
+
+
+\subsection{Quantized DoRA}
+
+Applies DoRA with low-bit base quantization; targets maximal memory savings, at the cost of extra compute/engineering overhead and longer wall-clock time \parencite{FineTuni58:online}.
+
+QDoRA combines the quantization strategy of QLoRA with DoRA’s weight decomposition, achieving the most aggressive memory reduction among the four methods. It allows fine-tuning on extremely limited hardware by lowering precision to 4-bit or 8-bit formats while still maintaining acceptable performance levels. Despite its efficiency in reducing VRAM consumption, QDoRA incurs the highest computational cost and longest training time. It performs best on modern GPUs with sufficient processing throughput or in offload-capable environments where latency is less critical \parencite{FineTuni58:online}. QDoRA offers the strongest memory savings, but its high computational cost and engineering effort make it less suitable for this work. It is better suited for very constrained devices or large industrial setups, rather than a single 12 GB GPU.
+
+
+\subsection{Fine-tuning Selection Rationale}
+
+For an academic project with a single 12GB GPU, the practical choice is therefore not simply best accuracy, but the best balance between performance, memory footprint, training stability, and implementation effort.
+
+Considering available computational resources (a single GPU with 12 GB VRAM) and the target model Phi-4-mini-instruct, LoRA was selected as the most suitable fine-tuning technique. Phi-4-mini-instruct, with 3.8 billion parameters, supports efficient LoRA adaptation, enabling training within stringent VRAM constraints.
+
+For the Agentic AI Tutor, full fine-tuning a 3.8B parameter model for each academic subject would exceed both VRAM and storage limits on a single 12GB GPU. Moreover, keeping a separate fully fine-tuned model for each subject would be environmentally and operationally expensive, because each model would repeat the full training and serving cost of the base model.
+
+While alternative methods like QLoRA and QDoRA theoretically offer greater memory savings through model quantization, on highly constrained hardware such as a 12 GB GPU, these methods introduce quantization overheads that can reduce training speed and increase complexity \parencite{FineTuni58:online}. DoRA, with its additional weight decomposition, requires more compute and longer training times, making it less practical for rapid experimental cycles on such hardware \parencite{FineTuni58:online}.
+
+LoRA, by contrast, balances speed, simplicity, memory efficiency, and training stability, making it a practical choice for fine-tuning Phi-4-mini-instruct in educational RAG pipelines. It facilitates quick iteration without full model retraining, is readily supported via Hugging Face PEFT, and performs robustly on GPUs with 12 GB VRAM \parencite{FineTuni58:online,2106096835:online}.
+
+\section{Multimodal Response Delivery}
+
+\subsection{Requirements}
+The multimodal output layer extends text-based tutoring with optional speech and a short avatar-style video response. The component selection was guided by the following requirements:
+\begin{enumerate}
+    \item \textbf{Cost and deployability}
+    The solution should be free to run for an academic MVP and self-hostable to avoid recurring API fees.
+    \item \textbf{Institutional suitability}
+    Components should be compatible with university deployment, including predictable licensing and the ability to run on-premise.
+    \item \textbf{Modular design}
+    Speech and video generation should be implemented as replaceable modules so that institutions can swap providers if policies change.
+\end{enumerate}
+
+\subsection{Text-to-Speech Options}
+
+\textbf{Piper} is described as a fast, local neural text to speech system and its repository is MIT licensed. This directly supports the cost/deployability requirement because it is designed for local usage, and it supports institutional suitability because the license is explicitly stated as MIT. In addition, rhasspy/piper-voices provides voice files where individual voice model cards may explicitly specify dataset licensing. For example, one voice model card lists a dataset license of CC0. This provides a clear licensing signal at the voice level, which is relevant for university deployment. \parencite{piperLIC61:online, rhasspyp13:online, dedeDEth1:online}
+
+\textbf{Coqui TTS} is an alternative open-source TTS toolkit. The repository is distributed under the Mozilla Public License 2.0 (MPL-2.0), as stated in the project license file. The Coqui documentation describes .models.json as a pretrained model list. The repository file TTS/.models.json includes a license field for pretrained model entries. In addition, the Coqui documentation states that "This model is licensed under Coqui Public Model License." Together, these sources provide licensing information at both the toolkit and model level. However, because a model can have its own stated license, deployment requires checking the license of the specific pretrained model artifact being used. \parencite{TTSLICEN25:online, TTSTTSmo24:online}
+
+\textbf{Mimic 3} is another local TTS option. Its repository states that Mimic 3 is available under the AGPL v3 license. This provides a clear licensing signal, but it is a different licensing model compared to permissive licenses such as MIT and may be treated differently by institutional policy. \parencite{mimic3Repo:online, mimic3License:online}
+
+\subsection{TTS Selection Rationale}
+Based on the stated properties in the official repositories and documentation, Piper was selected as the default TTS engine. Piper aligns with the cost and deployability requirement because it is explicitly described as a local neural TTS system. It aligns with institutional suitability because its repository license is explicitly MIT. In addition, Piper voices provide per-voice model cards where dataset licensing can be stated explicitly, enabling a university to verify the licensing of the exact voice artifact used. Finally, the system may implements TTS behind a provider interface so that Piper can be replaced by another toolkit if institutional policies require a different licensing or model choice.
+
+\subsection{Talking-Head}
+
+\textbf{SadTalker} is described as Learning Realistic 3D Motion Coefficients for Stylized Audio-Driven Single Image Talking Face Animation. This description directly matches the target workflow of generating a talking-head video from a single avatar image and an audio track. The project also includes a highlights section stating that "The license has been updated to Apache 2.0, and we've removed the non-commercial restriction." \parencite{GitHubOp96:online}
+
+\textbf{Wav2Lip} is presented as a lip-sync approach (speech to lip generation) rather than a full single-image talking-face animation pipeline. The repository also states that it can only be used for personal/research/non-commercial purposes. This directly conflicts with institutional suitability for deployment beyond non-commercial contexts. \parencite{GitHubRu28:online}
+
+\textbf{MuseTalk} is described as a real-time high quality audio-driven lip-syncing model, which indicates a focus on lip synchronisation. Its Disclaimer/License section stating that "The code of MuseTalk is released under the MIT License. There is no limitation for both academic and commercial usage." It also states: "The trained model are available for any purpose, even commercially." However, the same section states: "The testdata are collected from internet, which are available for non-commercial research purposes only." Therefore, if MuseTalk is adopted in an institutional setting, the university must ensure that any evaluation or demo datasets comply with the stated terms. This restriction applies to the repository's test data and does not describe internal university materials. \parencite{GitHubTM58:online, TMElyral83:online}
+
+
+\subsection{Video Selection Rationale}
+Based on the stated properties in official repositories, SadTalker was selected for the MVP video component. The choice aligns with institutional suitability because the repository highlights explicitly state an Apache 2.0 license update and the removal of a non-commercial restriction. In contrast, Wav2Lip explicitly limits usage to personal/research/non-commercial purposes. MuseTalk provides permissive statements for code and trained model usage, but also states a non-commercial restriction for test data, which introduces an additional artifact-level compliance check. In addition to licensing, the stated scope of SadTalker (audio-driven single image talking face animation) matches the intended tutor avatar workflow more directly than approaches described primarily as lip-syncing or speech-to-lip generation. Finally, the system implements video generation behind a provider interface so that the selected video generator can be replaced if institutional policies require a different component.
+
+\section{Frontend Framework}
+
+\subsection{Requirements}
+The frontend is responsible for the user-facing tutoring experience. In this project, it must support a subject-first flow (selecting a subject before tutoring), a chat interface with low perceived latency, and asynchronous delivery of optional video responses. The frontend framework selection was guided by the following requirements:
+
+\begin{enumerate}
+    \item \textbf{Chat-first interaction}
+    The interface must support a conversational flow where text answers are displayed immediately.
+    \item \textbf{Asynchronous video workflow}
+    Since video generation can take longer, the UI must support a background-job pattern and display video once available.
+    \item \textbf{Standard media rendering}
+    The frontend must support playback of generated MP4 outputs using standard web capabilities.
+    \item \textbf{Institutional deployment fit}
+    The solution should be suitable for a university environment, including self-hosted deployments and clear, documentation-backed implementation patterns.
+\end{enumerate}
+
+\subsection{Frontend Framework Options}
+
+The \textbf{Next.js} documentation states that Route Handlers allow you to create custom request handlers for a given route using the Web Request and Response APIs. It also states that Route Handlers are only available inside the app directory. This provides a documented mechanism to implement request/response endpoints for actions such as starting a video generation job and checking its status, which supports the asynchronous video workflow requirement. It also supports maintainability and institutional deployment fit by relying on an official, documented pattern for request handlers within the application structure. A potential trade-off is that this approach couples the UI framework to a specific file-based routing structure (the app directory), which the project must follow. \parencite{GettingS41:online,}
+
+The \textbf{SvelteKit} documentation states that API routes can be created by adding a +server.js file exporting functions corresponding to HTTP methods such as GET, PUT, POST, PATCH and DELETE. This provides a documented way to implement request handlers for job submission and status queries, supporting the asynchronous video workflow requirement. As with Next.js, the approach relies on a specific file-based convention +server.js, which the project must adopt for maintainability. \parencite{DocsSve12:online}
+
+The \textbf{Vite} documentation states that during development, Vite assumes that a modern browser is used and that Vite sets esnext as the transform target. This documentation emphasises development assumptions and build targets, which supports a modern web UI suitable for chat and media rendering. However, in the cited source Vite is not described as providing an API-route mechanism in the same way as Next.js Route Handlers or SvelteKit +server.js handlers. Therefore, implementing the asynchronous video workflow endpoints would rely on a separate backend service rather than a documented framework-level routing feature on this page. \parencite{GettingS68:online}
+
+\subsection{Frontend Selection Rationale}
+All three options can implement the Subject-first UX and Chat-first interaction, because these requirements are primarily UI-level concerns (routing, state management, and component composition) rather than framework-specific constraints. The key differentiator for this project is the asynchronous video workflow requirement, which benefits from a clear, documentation-backed way to implement request handlers for job submission and status checking. Next.js explicitly documents Route Handlers for creating custom request handlers using Web Request and Response APIs within the app directory. SvelteKit explicitly documents API routes via +server.js with HTTP method handlers. By contrast, the cited Vite documentation focuses on development assumptions and build targets rather than documenting an API-route mechanism on the same page.
+
+Based on these documented patterns, Next.js was selected. Its Route Handlers provide a clear mechanism for implementing the request/response endpoints required for the asynchronous video flow while keeping the frontend and related request handlers within a consistent application structure. Finally, the system keeps the frontend-to-backend interaction behind stable API contracts so that the UI framework can be replaced if required by institutional constraints.
+
+\section{Backend API}
+\subsection{Requirements}
+The backend provides the tutoring API and coordinates asynchronous media generation jobs (text response first, video later). The backend framework selection was guided by the following requirements:
+
+\begin{enumerate}
+    \item \textbf{API-first design and documentation}
+    The backend should support building Web APIs and provide a clear, documentation-backed mechanism for API documentation.
+    \item \textbf{Asynchronous and long-running workload support}
+    The system should be suitable for an architecture where some outputs are generated asynchronously and returned later.
+    \item \textbf{Data validation}
+    Request/response data handling should be explicit and reliable.
+    \item \textbf{Institutional deployment fit}
+    The solution should be self-hostable and compatible with university environments (clear licensing, deployable on-premise).
+    \item \textbf{Maintainability}
+    The framework should support a maintainable structure for an academic project handover.
+\end{enumerate}
+
+\subsection{Backend Framework Options}
+
+The \textbf{FastAPI} documentation describes it as a modern, fast (high-performance), web framework for building APIs with Python based on standard Python type hints. \parencite{FastAPIHome:online} The FastAPI documentation also states that it provides automatic interactive API documentation and that it is based on OpenAPI, with Swagger UI and ReDoc included by default. \parencite{FastAPIFeaturesDocs:online} In addition, the FastAPI features documentation states that FastAPI is fully compatible with (and based on) Starlette and lists Starlette features available in FastAPI, including WebSocket support and in-process background tasks. \parencite{FastAPIFeaturesStarlette:online} For deployment, the FastAPI documentation states that FastAPI is an ASGI web framework and that running a FastAPI application on a remote server requires an ASGI server program such as Uvicorn. \parencite{FastAPIDeployASGI:online} FastAPI is released under the MIT License in its source repository license file. \parencite{FastAPILicense:online} These statements directly support the API-first requirement (explicit API focus and automatic docs), the validation requirement (type hints with the documented FastAPI approach), and the asynchronous workload requirement via documented ASGI deployment and Starlette-based features. A trade-off is that video generation still requires a separate job execution approach (e.g., external workers), because the framework itself is not the job queue.
+
+The \textbf{Django REST framework} documentation describes DRF as a powerful and flexible toolkit for building Web APIs. It also lists reasons to use it, including a Web browsable API and authentication policies. \parencite{DRFHome:online} Separately, the Django documentation describes the Django admin site as an automatic admin interface that reads metadata from models and notes that its recommended use is limited to an organisation’s internal management tool. \parencite{DjangoAdmin:online} Django is distributed under the 3-clause BSD license according to its official FAQ. \parencite{DjangoLicenseFAQ:online} DRF directly addresses the API-first requirement (explicit Web API toolkit) and provides a documented developer-facing browsing interface for API resources, which can support maintainability during development. Django’s documented admin interface can be beneficial for internal management tasks. A potential trade-off is that this option introduces a broader framework surface (Django + DRF), which may be heavier than an API-first framework for an academic MVP focused primarily on API endpoints.
+
+The \textbf{Flask} documentation describes Flask as a lightweight WSGI web application framework designed to make getting started quick and easy, with the ability to scale to complex applications. \parencite{FlaskDocs:online} Flask provides the BSD-3-Clause license text in its documentation. \parencite{FlaskLicense:online} Flask supports building web applications and can be used for API endpoints, but the cited documentation characterises it primarily as a lightweight WSGI framework rather than an API-focused framework with built-in OpenAPI documentation. Therefore, meeting the API-first documentation requirement would rely on additional components not described in the cited page.
+
+\subsection{Backend Selection Rationale}
+Based on the documented properties above, FastAPI was selected as the backend framework for the MVP. FastAPI explicitly positions itself as a framework for building APIs and provides OpenAPI-based automatic interactive documentation (Swagger UI and ReDoc), which directly supports the API-first requirement. \parencite{FastAPIHome:online,FastAPIFeaturesDocs:online} FastAPI is also documented as an ASGI web framework intended to run with an ASGI server such as Uvicorn, which fits an architecture where some operations are handled asynchronously and results are delivered later. \parencite{FastAPIDeployASGI:online} Django+DRF remains a strong alternative because DRF is explicitly documented as a Web API toolkit and provides a browsable API, while Django provides an automatic admin interface recommended for internal management tools. \parencite{DRFHome:online,DjangoAdmin:online} Flask is documented as a lightweight WSGI framework and is suitable for web applications, but the cited documentation does not describe built-in OpenAPI documentation, making it less aligned with the API documentation requirement in this project. \parencite{FlaskDocs:online}
+
+\section{Infrastructure and MLOps Architecture}
+
+\subsection{Containerisation}
+
+\paragraph{Requirements.}
+In this project, each academic subject is packaged and deployed as a single container image, allowing it to run, update, and scale independently of the others. Containerisation therefore serves not only as a lightweight virtualisation layer but also as a key mechanism for reproducibility, portability, and maintainability of the system. The following requirements guided the choice and configuration of the container engine.
+
+\begin{enumerate}
+    \item \textbf{Performance and efficiency}  
+    The container engine must deliver near-native runtime performance and low start-up latency. Since each subject runs in its own isolated container, the overhead compared to bare-metal execution should remain minimal even when multiple containers operate concurrently on a single host.
+
+    \item \textbf{Reproducibility and portability}  
+    Each container image must be reproducible from version-controlled build files and compatible across environments (local, CI, and production).
+
+    \item \textbf{Independent deployment per subject}  
+    Every subject’s container must be built, released, and rolled back independently, without affecting others. This guarantees clear versioning, minimal downtime, and better fault isolation across the system.
+
+\end{enumerate}
+
+These requirements emphasise reproducibility, isolation, and operational simplicity, reflecting the academic context in which multiple subject-specific containers are developed and maintained independently.
+
+Containerisation provides OS-level virtualisation that isolates applications into lightweight execution environments sharing the host kernel, which makes start-up faster and resource use lower than with full virtual machines. In contrast to VMs, containers do not provision a separate guest OS or virtualised hardware up front; instead, the container engine maps resources at runtime, reducing overheads while preserving process isolation \parencite{Performa22:online}.
+
+\textbf{Docker} is the most widely adopted container engine since its introduction in 2013 by Docker, Inc. It provides a developer-friendly toolchain (Dockerfile, \texttt{docker build}, \texttt{docker run}), image distribution via Docker Hub/GHCR, and broad ecosystem integration (compose, buildx, multi-arch). Security posture relies on a long-running daemon with root privileges by default (rootless modes exist but are less common in legacy setups). Documentation and community support are extensive \parencite{DockerDo74:online}.
+
+\textbf{Podman} is a daemonless, rootless-by-default container engine developed by Red Hat engineers together with the open-source community. It offers a daemonless, rootless-by-default container engine with a CLI partially compatible with Docker, improving least-privilege operations and aligning better with hardened environments. While the Podman ecosystem is smaller, it integrates well with Kubernetes via \texttt{podman generate kube} and supports systemd-managed containers \parencite{Performa22:online}.
+
+An IEEE Xplore comparative study measured Docker vs Podman performance under synthetic web, database, and fileserver workloads. On equivalent hardware, the measured overhead of containerisation relative to the host was small for a single container and increased with concurrency. Across all workloads and container counts (1C/2C/3C), Podman consistently outperformed Docker by a modest margin. Nevertheless, the absolute differences remained small, and both engines operated close to native performance for single-container cases. Consequently, the study concludes that selection between Docker and Podman should be guided less by raw performance and more by operational requirements: daemonless/rootless security posture and slightly better I/O behaviour favour Podman, whereas ecosystem maturity and broad CI/CD and orchestration integration often favour Docker \parencite{Performa22:online,DockerDo74:online}.
+
+In this project, Docker is used as the main container engine. Podman gives slightly better performance and has a rootless, daemonless design, but Docker was chosen because it has a larger ecosystem and better integration. Many tutorials and examples also use Docker, which makes it easier for students to learn and reuse existing work. For this academic setting, these practical benefits are more important than the small performance advantage of Podman.
+
+\subsection{Continuous Integration and Delivery}
+
+\paragraph{Requirements.}
+Continuous Integration and Delivery in this project must ensure automated, reproducible, and transparent software delivery with minimal operational complexity. The following requirements guided the choice of CI/CD tools.
+
+\begin{enumerate}
+    \item \textbf{Automation and operational simplicity}  
+    The CI/CD system must enable automated build, test, and deployment pipelines with minimal manual intervention. Configuration should remain declarative and manageable by a small academic team without dedicated DevOps personnel.
+
+    \item \textbf{Reproducibility and transparency of delivery}  
+    Each pipeline execution should be traceable, version-controlled, and reproducible. The system must provide clear visibility into build results, artifact versions, and deployment status to maintain delivery confidence.
+
+    \item \textbf{Low maintenance and security compliance}  
+    The chosen tools should require minimal infrastructure management and support secure handling of credentials and secrets. Preference is given to managed or hosted solutions that reduce operational risk and maintenance overhead.
+\end{enumerate}
+
+Continuous Integration (CI) automates build and testing processes on every code change, while Continuous Delivery/Deployment (CD) publishes artifacts and synchronizes environments up to the target cluster. Different tools cover different parts of the pipeline: GitHub Actions and Jenkins focus primarily on CI (with optional CD capabilities), Tekton provides Kubernetes-native CI as a set of Custom Resource Definitions (CRDs), and Argo CD implements the GitOps approach to CD by continuously reconciling the live cluster state with the state described in Git \parencite{CICDTool40:online,GitHubAc85:online,ArgoCDDe97:online}.
+
+\textbf{GitHub Actions} is GitHub’s native hosted CI/CD platform (now part of Microsoft’s developer tooling ecosystem). It runs builds, tests, and containerization directly from the repository, simplifying the management of secrets, caching, and image publishing. A typical workflow involves building a Docker image, pushing it to GHCR, and then automatically updating the GitOps repository with the new image tag to trigger CD on the Argo CD side \parencite{GitHubAc85:online,CICDTool40:online,ArgoCDGi52:online}.
+
+\textbf{Jenkins} is an open-source automation server originally created by Kohsuke Kawaguchi at Sun Microsystems (under the name Hudson) and now maintained by a large community. It remains a flexible, self-hosted CI server with an extensive plugin ecosystem that supports complex pipelines and heterogeneous environments. It can drive image builds and push to registries, but requires more maintenance and security hardening \parencite{CICDTool40:online}.
+
+\textbf{Tekton} is a Kubernetes-native CI/CD project originally developed at Google as part of Knative Build/Pipelines and now hosted by the CD Foundation. It provides Kubernetes-native CI/CD via CRDs (\texttt{Task}, \texttt{Pipeline}, \texttt{PipelineRun}), enabling fully declarative pipelines managed like any other cluster resource \parencite{CICDTool40:online}.
+
+\textbf{Argo CD} is a Kubernetes-native GitOps continuous delivery tool that originated at Applatix (later acquired by Intuit) and is now a graduated CNCF project. It syncs the desired state declared in Git with the actual state in the cluster, enabling rollbacks, health checks, and progressive delivery. It can watch a GitOps repo that is automatically updated by CI (e.g., Actions), closing the loop from build to deployment \parencite{ArgoCDDe97:online}.
+
+For small academic teams, GitHub Actions provides the simplest CI integration with GitHub-hosted repositories, while Jenkins can be justified when custom plugins and on-prem pipelines are required. Tekton is optimal for fully Kubernetes-native CI. Argo CD is the de facto choice for GitOps-style CD. For a university RAG/SLM scenario (a single cluster with one GPU), the Actions $\rightarrow$ GHCR $\rightarrow$ GitOps-repo $\rightarrow$ Argo CD chain minimizes operational risks while maintaining delivery transparency \parencite{CICDTool40:online,ArgoCDGi52:online,ArgoCDDe97:online,GitHubAc85:online}.
+
+The project employs GitHub Actions for CI (build, testing, containerization, publishing to GHCR, and committing the updated image tag to the GitOps repository) and Argo CD for CD (GitOps synchronization of manifests within Kubernetes). Jenkins and Tekton are considered functional alternatives but are not selected due to their additional operational complexity and lack of practical added value in a constrained academic environment \parencite{CICDTool40:online,ArgoCDGi52:online,ArgoCDDe97:online,GitHubAc85:online}.
+
+\subsection{Orchestration}
+
+\paragraph{Requirements.}
+Container orchestration in this project must provide a reliable, portable, and reproducible runtime for multiple subject containers deployed across university and cloud environments. The following requirements guided the choice of orchestration technology.
+
+\begin{enumerate}
+    \item \textbf{Functional completeness and reliability}  
+    The orchestrator must support essential container management capabilities, including automated scheduling, scaling, self-healing, and rolling updates or rollbacks. These functions are necessary to maintain continuous service availability for subject-specific workloads.
+
+    \item \textbf{Portability and vendor neutrality}  
+    The orchestration layer should remain compatible across local GPU nodes and public clouds, preserving standard APIs and avoiding vendor lock-in. Workloads must be transferable between environments without modification of manifests or Helm charts.
+
+    \item \textbf{GitOps compatibility and reproducible deployment}  
+    The orchestrator must integrate seamlessly with GitOps tools such as Argo CD, ensuring that the live cluster state remains synchronized with version-controlled manifests. This enables reproducible, auditable, and declarative infrastructure management.
+
+    \item \textbf{Operational simplicity and sustainability}  
+    The solution should minimise administrative overhead for a small academic team, support managed control-plane options and operate efficiently with limited hardware resources. Preference is given to open-source or hybrid-friendly systems that balance control with maintainability.
+\end{enumerate}
+
+Container orchestration automates scheduling, scaling, and self-healing of long-running containers, turning ephemeral workloads into reliable services. While several systems competed historically, Kubernetes emerged as the de facto standard; managed variants such as Amazon EKS and alternative orchestrators like AWS ECS address similar goals with different operational trade-offs \parencite{Kubernet98:online,Kubernet67:online,RunConta17:online,Swarmmod44:online}.
+
+\textbf{Kubernetes} is an open-source container orchestration system originally designed by Google and now maintained by the Cloud Native Computing Foundation (CNCF). It provides a portable, open-source control plane for desired-state reconciliation: controllers continuously converge actual cluster state to the manifests declared in Git or other sources. Core capabilities include bin-packing schedulers, rollbacks, health probes, and horizontal autoscaling for pods and nodes. Its ecosystem breadth (CNIs, storage classes, operators) and cloud/on-prem neutrality make it suitable for hybrid and multi-cloud deployments where portability and vendor independence are priorities \parencite{Kubernet67:online,Kubernet98:online}.
+
+\textbf{Amazon EKS} offers Kubernetes as a managed service on AWS that control planes are operated by AWS, while workloads run on EC2 nodes or on Fargate. This reduces day-2 admin for cluster lifecycle and control-plane resilience, while preserving Kubernetes APIs and portability of workload definitions (Helm/Manifests/Operators). EKS thus keeps the operational model and ecosystem of Kubernetes, but with cloud-provider management of masters; organizations trade some low-level control of control planes for reduced toil and faster time-to-operate \parencite{Kubernet98:online}.
+
+\textbf{AWS ECS} orchestrates containers with a simpler, AWS-opinionated model (tasks, services, cluster capacity via EC2 or serverless Fargate). It delivers autoscaling and high availability without exposing the full Kubernetes surface. ECS is tightly integrated with AWS and historically aligns to the Docker runtime; its strengths are streamlined operations on AWS and a gentler learning curve compared to “full” Kubernetes. The trade-offs are provider lock-in and less portability across clouds; certain constructs (e.g., DaemonSet-style per-node agents) are not available on Fargate \parencite{Kubernet98:online,RunConta17:online}.
+
+Both Kubernetes, Amazon EKS and AWS ECS fulfil the basic orchestration functions of scheduling, scaling, and self-healing. However, their design philosophies diverge in ways that directly affect the project’s requirements. ECS provides simplified, AWS-specific orchestration that is well suited for organisations fully embedded in the AWS ecosystem, but its limited portability and vendor lock-in make it less appropriate for hybrid academic environments. In contrast, Kubernetes offers a cloud-agnostic, open-source control plane that aligns closely with the project’s priorities of portability, reproducible GitOps delivery, and maintainability on both local GPU nodes and cloud infrastructure. EKS extends these advantages by reducing administrative overhead through managed control-plane operations while preserving the standard Kubernetes API and Argo CD workflows. Therefore, Kubernetes was selected as the orchestration baseline, with EKS as the managed option for AWS environments, as it best satisfies the project’s requirements for reliability, portability, GitOps integration, and operational simplicity.
+
+\section{Implications for the Project}
+
+This chapter consolidated the key technical decisions that form the foundation of the Agentic AI Tutor system. The model evaluation process identified Phi-4-mini-instruct as the most suitable base model, balancing reasoning accuracy, energy efficiency, and open-source accessibility within the hardware and ethical constraints of an academic environment. Among parameter-efficient fine-tuning techniques, LoRA was selected for its stability and memory efficiency on single-GPU (12 GB VRAM) setups. The supporting infrastructure was designed to ensure reproducibility, portability, and low operational complexity: Docker enables isolated deployment per subject, GitHub Actions and Argo CD provide automated and transparent CI/CD delivery, and Kubernetes/EKS orchestrates containerised workloads across local and cloud environments. 
+
+Together, these components establish a sustainable and reproducible MLOps architecture tailored to small-scale educational research. Accessibility considerations such as subtitles, speech-based interaction, and inclusive UI design, further ensure that the system supports diverse learners. Overall, the chosen architecture achieves the project’s goals of efficiency, transparency, and scalability while remaining practical for academic deployment and future experimentation.
+
+In the next chapter, the focus moves from technical options to the overall methodology. It describes how the chosen technology are combined into a complete workflow for developing the Agentic AI Tutor.

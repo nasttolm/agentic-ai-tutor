@@ -1,0 +1,168 @@
+# Microservices architecture: 3 separate backend services (one per subject)
+# Each service loads only its own LoRA adapter (baked into image) and connects
+# to its dedicated ChromaDB HTTP service.
+
+services:
+  # ============================================================================
+  # ChromaDB Services (one per subject)
+  # ============================================================================
+  fsd-chroma:
+    image: chromadb/chroma:latest
+    container_name: ai-tutor-fsd-chroma
+    volumes:
+      - ./backend/data/rag/fsd/chroma_store:/data
+    restart: unless-stopped
+
+  fcs-chroma:
+    image: chromadb/chroma:latest
+    container_name: ai-tutor-fcs-chroma
+    volumes:
+      - ./backend/data/rag/fcs/chroma_store:/data
+    restart: unless-stopped
+
+  dma-chroma:
+    image: chromadb/chroma:latest
+    container_name: ai-tutor-dma-chroma
+    volumes:
+      - ./backend/data/rag/dma/chroma_store:/data
+    restart: unless-stopped
+
+  # ============================================================================
+  # Backend Services (one per subject)
+  # ============================================================================
+  sadtalker:
+    build:
+      context: ./backend/data/sadtalker
+    container_name: ai-tutor-sadtalker
+    ports:
+      - "7860:7860"
+    environment:
+      - SADTALKER_DEVICE=cuda
+    volumes:
+      - ./backend/data/sadtalker/checkpoints:/sadtalker/checkpoints
+      - ./backend/data/sadtalker/gfpgan:/app/gfpgan
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    restart: unless-stopped
+
+  fsd-service:
+    build: ./backend
+    container_name: ai-tutor-fsd
+    ports:
+      - "8001:8000"
+    environment:
+      - SUBJECT=fsd
+      - CHROMA_HOST=fsd-chroma
+      - CHROMA_PORT=8000
+      - SADTALKER_URL=http://sadtalker:7860
+      - SADTALKER_TIMEOUT=600
+      - TTS_ENABLED=true
+    volumes:
+      - ./backend/data/piper:/app/data/piper
+    depends_on:
+      - fsd-chroma
+      - sadtalker
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  fcs-service:
+    build: ./backend
+    container_name: ai-tutor-fcs
+    ports:
+      - "8002:8000"
+    environment:
+      - SUBJECT=fcs
+      - CHROMA_HOST=fcs-chroma
+      - CHROMA_PORT=8000
+      - SADTALKER_URL=http://sadtalker:7860
+      - SADTALKER_TIMEOUT=600
+      - TTS_ENABLED=true
+    volumes:
+      - ./backend/data/piper:/app/data/piper
+    depends_on:
+      - fcs-chroma
+      - sadtalker
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  dma-service:
+    build: ./backend
+    container_name: ai-tutor-dma
+    ports:
+      - "8003:8000"
+    environment:
+      - SUBJECT=dma
+      - CHROMA_HOST=dma-chroma
+      - CHROMA_PORT=8000
+      - SADTALKER_URL=http://sadtalker:7860
+      - SADTALKER_TIMEOUT=600
+      - TTS_ENABLED=true
+    volumes:
+      - ./backend/data/piper:/app/data/piper
+    depends_on:
+      - dma-chroma
+      - sadtalker
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ============================================================================
+  # Frontend
+  # ============================================================================
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        NEXT_PUBLIC_FSD_API_URL: http://localhost:8001
+        NEXT_PUBLIC_FCS_API_URL: http://localhost:8002
+        NEXT_PUBLIC_DMA_API_URL: http://localhost:8003
+    container_name: ai-tutor-frontend
+    ports:
+      - "3000:3000"
+    depends_on:
+      - fsd-service
+      - fcs-service
+      - dma-service
+    restart: unless-stopped
+
+# Note: For production with Kubernetes, use Ingress to route:
+# /api/fsd/* -> fsd-service
+# /api/fcs/* -> fcs-service
+# /api/dma/* -> dma-service

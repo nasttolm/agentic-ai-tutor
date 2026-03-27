@@ -1,0 +1,104 @@
+# Local development: uses pre-built image + mounts local chroma_store data
+# Run: docker compose -f docker-compose.local.yml up
+#
+# Requirements:
+#   - docker build -t ai-tutor-backend:test ./backend  (already done)
+#   - NVIDIA GPU with 12GB+ VRAM (3 x ~3-4GB for 4-bit quantization)
+
+services:
+  fsd-chroma:
+    image: chromadb/chroma:latest
+    container_name: ai-tutor-fsd-chroma
+    volumes:
+      - ./backend/data/rag/fsd/chroma_store:/data
+    restart: unless-stopped
+
+  fcs-chroma:
+    image: chromadb/chroma:latest
+    container_name: ai-tutor-fcs-chroma
+    volumes:
+      - ./backend/data/rag/fcs/chroma_store:/data
+    restart: unless-stopped
+
+  dma-chroma:
+    image: chromadb/chroma:latest
+    container_name: ai-tutor-dma-chroma
+    volumes:
+      - ./backend/data/rag/dma/chroma_store:/data
+    restart: unless-stopped
+
+  fsd-service:
+    image: ai-tutor-backend:test
+    container_name: ai-tutor-fsd
+    ports:
+      - "8001:8000"
+    environment:
+      - SUBJECT=fsd
+      - CHROMA_HOST=fsd-chroma
+      - CHROMA_PORT=8000
+    depends_on:
+      - fsd-chroma
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    restart: unless-stopped
+
+  fcs-service:
+    image: ai-tutor-backend:test
+    container_name: ai-tutor-fcs
+    ports:
+      - "8002:8000"
+    environment:
+      - SUBJECT=fcs
+      - CHROMA_HOST=fcs-chroma
+      - CHROMA_PORT=8000
+    depends_on:
+      - fcs-chroma
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    restart: unless-stopped
+
+  dma-service:
+    image: ai-tutor-backend:test
+    container_name: ai-tutor-dma
+    ports:
+      - "8003:8000"
+    environment:
+      - SUBJECT=dma
+      - CHROMA_HOST=dma-chroma
+      - CHROMA_PORT=8000
+    depends_on:
+      - dma-chroma
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        NEXT_PUBLIC_FSD_API_URL: http://localhost:8001
+        NEXT_PUBLIC_FCS_API_URL: http://localhost:8002
+        NEXT_PUBLIC_DMA_API_URL: http://localhost:8003
+    container_name: ai-tutor-frontend
+    ports:
+      - "3000:3000"
+    depends_on:
+      - fsd-service
+      - fcs-service
+      - dma-service
+    restart: unless-stopped

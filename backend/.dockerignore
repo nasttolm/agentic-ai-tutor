@@ -1,0 +1,13 @@
+venv/
+data/rag/
+data/eval_qa/
+data/metrics_outputs/
+__pycache__/
+*.pyc
+*.pyo
+.git/
+.env
+.env.*
+notebooks/
+tests/
+*.md

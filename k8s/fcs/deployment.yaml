@@ -1,0 +1,56 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fcs-service
+  namespace: ai-tutor
+  labels:
+    app: ai-tutor
+    subject: fcs
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ai-tutor
+      subject: fcs
+  template:
+    metadata:
+      labels:
+        app: ai-tutor
+        subject: fcs
+    spec:
+      containers:
+        - name: fcs-service
+          image: ghcr.io/nasttolm/ai-tutor-backend:latest
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 8000
+          env:
+            - name: SUBJECT
+              value: "fcs"
+            - name: CHROMA_HOST
+              value: "fcs-chroma"
+            - name: CHROMA_PORT
+              value: "8000"
+            - name: NVIDIA_VISIBLE_DEVICES
+              value: "all"
+            - name: NVIDIA_DRIVER_CAPABILITIES
+              value: "compute,utility"
+          resources:
+            requests:
+              memory: "4Gi"
+              cpu: "1"
+            limits:
+              memory: "12Gi"
+              cpu: "4"
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 300
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 600
+            periodSeconds: 30

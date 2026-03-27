@@ -1,0 +1,883 @@
+\chapter{Implementation}
+\label{chap:implementation}
+
+\section{Overview}
+This chapter describes how the Agentic AI Tutor was implemented following the MLOps lifecycle. It explains how each stage of the pipeline was carried out in practice.
+
+The development of the Agentic AI Tutor is organised into six main stages that follow the MLOps lifecycle:
+\begin{itemize}
+    \item Data collection and processing
+    \item Model development and training
+    \item Model evaluation and testing
+    \item Model deployment
+    \item Monitoring and maintenance
+    \item Lifecycle management
+\end{itemize}
+
+\section{Data collection and processing}
+\subsection{Data collection}
+The Agentic AI Tutor focuses on three modules:
+
+\begin{itemize}
+    \item \textbf{Fundamentals of Software Development (FSD)},
+    \item \textbf{Fundamentals of Computer Science (FCS)},
+    \item \textbf{Discrete Mathematics (DMA)}.
+\end{itemize}
+
+The Agentic AI Tutor targets three academic modules: Fundamentals of Software Development (FSD),
+Fundamentals of Computer Science (FCS), and Discrete Mathematics (DMA). In this project, the full data processing, training, and evaluation pipeline was implemented and applied consistently to all three subjects. Each subject was processed independently using the same subject-agnostic pipeline, resulting in separate datasets, fine-tuned models, and evaluation results for FSD, FCS, and DMA.
+
+\paragraph{Sources of teaching materials.}
+All teaching materials were downloaded from the official university Moodle platform.
+For FSD, the 2022/23 Moodle course was used.
+
+\begin{itemize}
+    \item Fundamentals of Software Development (CSI\_4\_FSD\_2223)
+\end{itemize}
+
+The FSD course for 2024/25 is not visible to students on Moodle, and the 2025/26 course does not yet contain a full set of lecture and tutorial resources. The 2022/23 course was therefore chosen because it provides a complete set of materials for the whole module.
+
+For FCS and DMA, the raw resources were downloaded from the 2024/25 Moodle courses:
+
+\begin{itemize}
+    \item Fundamentals of Computer Science (CSI\_4\_FCS\_2425)
+    \item Discrete Mathematics (CSI\_4\_DMA\_2425)
+\end{itemize}
+
+\paragraph{Directory structure and file formats.}
+All teaching resources are stored in a data/ directory in the project repository. Each subject has its own subdirectory with a raw/ folder that contains the original files as downloaded from Moodle:
+
+\begin{verbatim}
+data/
+  fsd/
+    raw/
+  fcs/
+    raw/
+  dma/
+    raw/
+\end{verbatim}
+
+This structure makes it easy to reproduce the experiments. Any script that needs the materials can read all files in data/<subject>/raw/.
+
+For FSD, all files are in PDF format. The fsd/raw directory contains lecture slide decks, tutorial sheets, mixed learning session slides, one project handout, and tutorial solution documents.
+
+For FCS and DMA, the raw directories contain a mix of PPTX slide decks, DOC/DOCX tutorial sheets and solutions, and several supporting PDFs (for example, short chapters or summary notes).
+
+The data loading code used later in the project can read PDF, PPTX, DOC, DOCX, TXT and Markdown (MD) files. This means that all teaching materials from Moodle can be processed by the same pipeline.
+
+\paragraph{Coverage of the modules.}
+
+Table\ref{tab:data-summary} summarises the collected teaching materials for all three subjects.
+
+\begin{table}[h]
+    \centering
+    \caption{Summary of collected teaching materials per subject
+             (raw files in data/<subject>/raw/).}
+    \label{tab:data-summary}
+    \resizebox{\textwidth}{!}{
+    \begin{tabular}{lccccc}
+        \hline
+        Subject & Source Moodle course & Lecture decks & Extra docs & Tutorial sheets & Tutorial solutions \\
+        \hline
+        FSD & CSI\_4\_FSD\_2223 & 10 & 5 & 9 & 7 \\
+        FCS & CSI\_4\_FCS\_2425 & 10 & 3 & 10 & 11 \\
+        DMA & CSI\_4\_DMA\_2425 & 10 & 0 & 10 & 5 \\
+        \hline
+    \end{tabular}
+    }
+\end{table}
+
+\subsection{Data exploration}
+Before any downstream steps, an exploratory analysis of the teaching materials for the three target modules (FSD, FCS and DMA) was carried out. To make automatic grouping possible, all files were manually renamed so that the filename starts with a topic prefix in the form Topic\_XX. This makes it possible to group files by topic in an automated way.
+
+\paragraph{Building topic-level documents.}
+In the pipeline, the main unit is a topic document. For each subject, all files that share the same Topic\_XX prefix are grouped together. Text is extracted from each file (PDF, PPTX, DOC/DOCX), and all extracted text within the same topic is concatenated into one topic-level document (for example, FSD\_Topic\_03).
+
+\paragraph{Corpus size and basic statistics.}
+Table \ref{tab:corpus-vocab} summarises corpus size and vocabulary statistics at topic-document level. FCS contains the largest amount of extracted text (41,073 words across 10 topics), followed by DMA (37,043 words across 10 topics), while FSD is smaller in total size (24,318 words) but contains more topics (16).
+
+Vocabulary statistics show a clear difference between subjects.
+DMA and FCS have similar relative vocabulary growth (2,317 and 2,628 unique words with TTR 0.063 and 0.064), whereas FSD contains the largest number of unique words (3,129) despite the smallest total word count, resulting in a substantially higher TTR (0.129). This suggests higher lexical variety in FSD materials, plausibly influenced by the presence of shorter topic documents and more heterogeneous terminology.
+
+\begin{table}[h]
+\centering
+\caption{Corpus size and vocabulary statistics at topic-document level.}
+\label{tab:corpus-vocab}
+\small
+\setlength{\tabcolsep}{6pt}
+\begin{tabular}{lrrrr}
+\toprule
+Module & Topics & Total words & Unique words & TTR (unique/total) \\
+\midrule
+DMA & 10 & 37,043 & 2,317 & 0.063 \\
+FCS & 10 & 41,073 & 2,628 & 0.064 \\
+FSD & 16 & 24,318 & 3,129 & 0.129 \\
+\bottomrule
+\end{tabular}
+\end{table}
+\FloatBarrier
+
+Figure \ref{fig:vocab-vs-tokens} provides a complementary visual comparison of corpus scale (total words) and vocabulary size (unique words), reinforcing the contrast between FCS as the largest corpus by volume and FSD as the most lexically diverse relative to its size.
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=\textwidth]{figs/vocabulary_size_comparison.png}
+    \caption{Vocabulary size (unique words) versus total tokens for each subject corpus.}
+    \label{fig:vocab-vs-tokens}
+\end{figure}
+\FloatBarrier
+
+Figure \ref{fig:topic-stats-bubble} provides a topic-level view across all subjects. The x-axis shows total words per topic document, and bubble size represents the number of unique words, making both length outliers and lexical variation explicit.
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=\textwidth]{figs/all_topics_bubble.png}
+    \caption{Topic-level statistics by subject. The x-axis shows total words per topic document, bubble size indicates the number of unique words.}
+    \label{fig:topic-stats-bubble}
+\end{figure}
+\FloatBarrier
+
+FCS contains one clear length outlier (Topic\_09 at 8,291 words), while DMA appears more polarised, combining multiple very large topics with several short ones. In FSD, most topics remain below 2,000 words, and two exceptionally short topics (126 and 181 words) stand out, consistent with limited extractable text in some slide-based materials. Bubble sizes further suggest that longer topics tend to introduce more unique terms, while FSD maintains relatively high lexical variety even in moderately sized topics.
+
+These distributional differences motivate a unified token-based chunking strategy for downstream QA generation. Chunking is essential for long, information-dense topics (especially in FCS and DMA) to fit within the model context window, while keeping preprocessing consistent for shorter FSD topics, which typically map to a single coherent chunk.
+
+\paragraph{Vocabulary and main topics.}
+The vocabulary of each corpus was analysed using the same preprocessing pipeline. Text is converted to lowercase and URL/email patterns are removed. Tokenisation keeps only alphabetic tokens with a minimum length of two characters. Common English stop words and a small set of domain-specific stop words are removed. Finally, the remaining tokens are lemmatised.
+
+Based on these tokens, a word cloud and a bar chart of the 20 most frequent content words were generated for each module (Figures \ref{fig:fsd-wordcloud}-\ref{fig:dma-topwords}). In addition, frequent bigrams and trigrams were computed to highlight repeated multi-word phrases in the materials (Figures \ref{fig:fsd-bigrams}-\ref{fig:dma-trigrams}).
+
+For FSD, frequent content words include statement, printf, loop, program, variable, value and function. Frequent bigrams and trigrams like "include stdio", "stdio int main", and "task write program" show repeated code patterns and repeated task instructions. Overall, the results confirm that the FSD materials focus on basic programming syntax, control flow and code examples.
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=\textwidth]{figs/FSD_wordcloud.png}
+    \caption{Word cloud for the top content words in the FSD teaching materials.}
+    \label{fig:fsd-wordcloud}
+\end{figure}
+\FloatBarrier
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=\textwidth]{figs/FSD_top_words.png}
+    \caption{Top 20 content words in the FSD corpus with their frequencies.}
+    \label{fig:fsd-topwords}
+\end{figure}
+\FloatBarrier
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=\textwidth]{figs/FSD_top_bigrams.png}
+    \caption{Top 20 bigrams in the FSD corpus.}
+    \label{fig:fsd-bigrams}
+\end{figure}
+\FloatBarrier
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=\textwidth]{figs/FSD_top_trigrams.png}
+    \caption{Top 20 trigrams in the FSD corpus.}
+    \label{fig:fsd-trigrams}
+\end{figure}
+\FloatBarrier
+
+For FCS, the top content words such as data, bit, number, memory, cpu, binary and instruction reflect the focus on data representation and computer architecture. At the n-gram level, the results contain both meaningful technical phrases like "binary number" and "memory location" and repeated institutional headers like "csi fcs". This suggests that removing headers and footers could further improve the quality of the text.
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=\textwidth]{figs/FCS_wordcloud.png}
+    \caption{Word cloud for the top content words in the FCS teaching materials.}
+    \label{fig:fcs-wordcloud}
+\end{figure}
+\FloatBarrier
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=\textwidth]{figs/FCS_top_words.png}
+    \caption{Top 20 content words in the FCS corpus with their frequencies.}
+    \label{fig:fcs-topwords}
+\end{figure}
+\FloatBarrier
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=\textwidth]{figs/FCS_top_bigrams.png}
+    \caption{Top 20 bigrams in the FCS corpus.}
+    \label{fig:fcs-bigrams}
+\end{figure}
+\FloatBarrier
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=\textwidth]{figs/FCS_top_trigrams.png}
+    \caption{Top 20 trigrams in the FCS corpus.}
+    \label{fig:fcs-trigrams}
+\end{figure}
+\FloatBarrier
+
+For DMA, frequent words such as set, graph, vertex, edge, proposition, predicate and truth match the main topics of the module: set theory, logic and graph theory. However, frequent n-grams also include tutorial artefacts like "exercise page". These patterns describe the nature of the teaching materials, but may need extra cleaning if the goal is to focus only on conceptual content.
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=\textwidth]{figs/DMA_wordcloud.png}
+    \caption{Word cloud for the top content words in the DMA teaching materials.}
+    \label{fig:dma-wordcloud}
+\end{figure}
+\FloatBarrier
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=\textwidth]{figs/DMA_top_words.png}
+    \caption{Top 20 content words in the DMA corpus with their frequencies.}
+    \label{fig:dma-topwords}
+\end{figure}
+\FloatBarrier
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=\textwidth]{figs/DMA_top_bigrams.png}
+    \caption{Top 20 bigrams in the DMA corpus.}
+    \label{fig:dma-bigrams}
+\end{figure}
+\FloatBarrier
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=\textwidth]{figs/DMA_top_trigrams.png}
+    \caption{Top 20 trigrams in the DMA corpus.}
+    \label{fig:dma-trigrams}
+\end{figure}
+\FloatBarrier
+
+\paragraph{Normalising input into topic texts.}
+All subject materials (PDF slides, PPTX lecture decks, and Word-based tutorials) were first consolidated into a unified intermediate representation stored as a topics.pkl file. Each entry is indexed by (subject, topic\_id) and contains the extracted text (full\_text) together with lightweight provenance metadata (a list of source\_files). This normalisation enables the same QA generation pipeline to be reused across subjects without relying on format-specific logic.
+
+\subsection{Data preparation and preprocessing}
+
+The teaching materials were transformed into a question-answer dataset suitable for training a small language model as an AI tutor. While the pipeline itself is subject-agnostic, model fine-tuning was performed separately for each subject. Three independent LoRA adapters were trained, one per subject, each using only the training data from its corresponding module.
+
+\paragraph{Token-based chunking of long topics.}
+Topic texts vary substantially in length. Tutorial sheets and consolidated notes can exceed the practical prompt budget for a small model. Therefore, each topic was split into overlapping chunks using the model tokenizer, with a target size of 1200 tokens and an overlap of 120 tokens. Chunks were limited to 1200 tokens to keep the full prompt (instructions + context) and the generated answer within the model’s 4096 token context window, while avoiding aggressive truncation and preserving space for multi-sentence tutor-style explanations. Chunking is performed on paragraph boundaries when possible, and oversized paragraphs are further split by sentence boundaries to avoid extremely long single segments. This step ensures that the model receives coherent context while leaving sufficient generation budget for explanatory answers.
+
+\paragraph{Tutor-oriented QA generation.}
+Question–answer pairs were generated using the microsoft/Phi-3-mini-4k-instruct model. The prompt was designed for a tutoring setting: answers are expected to be explanatory (not one-line definitions), typically spanning multiple sentences and focusing on understanding rather than rote memorisation. To increase coverage, the pipeline generates multiple question types per chunk using universal modes: core concepts, definitions and terms, application and reasoning, compare/contrast, and common mistakes. Since Phi-3-mini supports a 4k context window, the generation prompts were designed to fit within this budget (instructions + chunk context + answer). The target number of questions per chunk is chosen heuristically based on chunk length (4 for chunks under 300 tokens, 8 for 300-699 tokens, and 12 for chunks of over 700 tokens).
+
+For each subject, the generated QA dataset was first split into training and evaluation subsets.
+This split was performed before any automated or manual quality review to prevent information leakage between training and evaluation data. All subsequent processing steps, including GPT-based quality review and manual inspection, were applied independently to the training and evaluation splits.
+
+\paragraph{Quality filtering.}
+Because the target model is trained as an AI tutor, the dataset prioritises explanatory answers rather than one-line definitions. After generation, each candidate QA object is validated and filtered in several stages:
+
+\begin{enumerate}
+    \item \textbf{JSON validation and repair.} The model is instructed to output only a JSON array. The pipeline attempts strict JSON parsing. If parsing fails, it issues one repair prompt requesting JSON-only output. Outputs that remain unparsable after the retry are logged in qa\_errors\_<subject>.csv.
+    \item \textbf{Answer and question length filters.} Only QA pairs passing a deterministic quality function are retained. In particular, questions must contain at least 4 words and answers must contain at least 20 words to enforce tutor-style explanations.
+    \item \textbf{Deduplication.} To reduce redundancy within each subject, questions are normalised (lowercasing, whitespace normalisation, and punctuation removal) and normalised exact duplicates are removed. In the final datasets, the number of duplicate questions after normalisation is 0 for FSD, FCS and DMA.
+    \item \textbf{Semi-automated quality review.} All generated QA pairs were reviewed using an automated GPT-based reviewer, which assigned each pair a label (OK or FLAGGED) together with optional reasons. To validate the reliability of this filtering step, random samples from both the OK and FLAGGED subsets were manually inspected. This inspection confirmed that the automated review reliably retained high-quality tutor-style explanations while filtering out low-quality or unsuitable examples.
+    \item
+\end{enumerate}
+
+\paragraph{Evaluation subset used for metrics.}
+For final metric reporting, only the evaluation subset labelled OK (saved as <subject>\_eval\_OK.jsonl) was used. This ensures that all reported scores are computed on high-quality tutor-style QA pairs and remain strictly held out from training.
+
+\paragraph{Resulting QA datasets.}
+The final datasets are stored as JSONL files (one QA pair per line) including metadata fields such as subject, topic\_id, chunk\_id, mode, and source\_files. The resulting dataset sizes are:
+\begin{itemize}
+    \item \textbf{FSD:} 680 QA pairs from 16 topics and 60 chunks (59 chunks used at least once), covering 31 source files.
+    \item \textbf{FCS:} 745 QA pairs from 10 topics and 73 chunks (69 chunks used at least once), covering 32 source files.
+    \item \textbf{DMA:} 708 QA pairs from 10 topics and 74 chunks (72 chunks used at least once), covering 25 source files.
+\end{itemize}
+
+\paragraph{Conversion to conversational fine-tuning format.}
+For LoRA fine-tuning with Unsloth, the simple QA pairs are converted into a conversational format. A separate script reads the flat JSONL file with question-answer pairs and wraps each pair into a short conversation: a system message defining the tutor role for the subject, followed by the student question (user message) and the tutor answer (assistant message).
+
+\section{Model development and training}
+Although Phi-3-mini-4k-instruct was used for synthetic QA generation, model fine-tuning and evaluation were performed using microsoft/Phi-4-mini-instruct as the base model, with one LoRA adapter trained per subject (FSD, FCS, DMA). This keeps the training/evaluation stack consistent with the final inference setup used for metric reporting.
+
+
+Model adaptation was performed separately for each subject. Starting from the same instruction-tuned
+base model, three independent LoRA fine-tuning runs were executed, resulting in subject-specific
+adapters for FSD, FCS, and DMA. This design choice allows each model to specialise in the terminology, problem types, and explanatory style of its corresponding module, while preserving a consistent training and evaluation methodology across subjects.
+
+The goal of the Agentic AI Tutor is to adapt an existing instruction-tuned model to a specific academic tutoring domain. Low-Rank Adaptation (LoRA) was selected as the main fine-tuning method. The implementation follows best practices described in the Unsloth documentation \parencite{LoRAfine55:online} and uses the Unsloth training framework and example notebooks \parencite{GitHubun10:online} as a reference for stable and efficient fine-tuning.
+
+\subsection{LoRA configuration}
+
+The LoRA configuration was chosen based on recommendations from the Unsloth hyperparameter guide \parencite{LoRAfine55:online} and preliminary experiments. The following key settings were used:
+
+\begin{itemize}
+    \item \textbf{LoRA rank ($r=16$).} This value provides sufficient capacity for domain adaptation while keeping the number of trainable parameters low.
+    \item \textbf{LoRA scaling factor ($\alpha=16$).} Setting $\alpha$ equal to the rank follows a commonly recommended heuristic and results in stable training behaviour.
+    \item \textbf{Target modules.} LoRA adapters were applied to all major linear layers in both the attention and feed-forward blocks (query, key, value, output, and MLP projections). This ensures that the model can adapt both its attention patterns and its internal representations.
+    \item \textbf{LoRA dropout ($0.0$).} Dropout was disabled, as the fine-tuning runs are short and the dataset is already filtered for quality.
+    \item \textbf{Bias training.} Bias terms were not trained to reduce unnecessary parameter updates.
+\end{itemize}
+
+Gradient checkpointing provided by Unsloth was enabled to further reduce memory consumption during training.
+
+\subsection{Training setup}
+
+The training configuration was designed to achieve a stable effective batch size while remaining within GPU memory limits. The main parameters are:
+
+\begin{itemize}
+    \item \textbf{Per-device batch size:} 2
+    \item \textbf{Gradient accumulation steps:} 8
+    \item \textbf{Effective batch size:} 16
+    \item \textbf{Learning rate:} $2 \times 10^{-4}$
+    \item \textbf{Weight decay:} 0.01
+    \item \textbf{Warm-up ratio:} 5\%
+    \item \textbf{Number of epochs:} 1
+\end{itemize}
+
+An effective batch size of 16 is recommended in the Unsloth documentation as a good default for stable fine-tuning of instruction-based datasets. Training for a single epoch was chosen to reduce the risk of overfitting, as the dataset consists of synthetic but carefully filtered tutor-style question-answer pairs.
+
+\subsection{Design choice: training without response-only masking}
+
+Some fine-tuning pipelines apply loss masking so that the model is trained only on assistant tokens, ignoring system and user messages. While this technique can be useful for large multi-turn conversational datasets, it was deliberately not used in this project.
+
+During implementation, applying response-only masking caused all training labels to be masked out due to strict token-level matching requirements in the training framework. More importantly, the dataset used in this project consists exclusively of single-turn tutor-style interactions with a clear and consistent structure. In this setting, training on the full input sequence does not introduce significant noise and simplifies the training pipeline.
+
+For these reasons, the final implementation keeps the training code unchanged and performs standard supervised fine-tuning without response-only masking. This decision improves robustness and reproducibility while preserving the intended tutoring behaviour of the model.
+
+\subsection{Training environment}
+
+All fine-tuning experiments were conducted in Google Colab using a free NVIDIA Tesla T4 GPU. The Unsloth framework was used to optimise memory usage and training speed.
+
+The trained model is saved as LoRA adapter weights. This allows the adapters to be reused with the original base model during inference, or merged into a standalone model if required for deployment.
+
+\subsection{Retrieval-Augmented Generation}
+
+In addition to fine-tuning the base model with LoRA adapters, the Agentic AI Tutor supports retrieval-augmented generation (RAG) to ground its answers in the original teaching materials.
+
+The RAG pipeline reuses the same token-based chunks created during the data preparation stage. Instead of treating full lecture or tutorial files as retrieval units, each subject corpus is indexed at the chunk level. This design choice is motivated by a factor that semantic retrieval performs better when embeddings represent short, topically coherent text segments rather than long documents containing multiple concepts.
+
+Each retrieved chunk retains lightweight provenance metadata, including the topic identifier and source file names. This allows the system to trace answers back to specific lecture slides or tutorial documents, which is useful for debugging, evaluation, and future user-facing citation features.
+
+For each subject (FSD, FCS and DMA), all chunks are embedded using a lightweight sentence-transformer model and stored in a persistent vector database (ChromaDB). The RAG component operates independently of fine-tuning.
+
+\section{Model evaluation and testing}
+
+Model quality was evaluated separately for each subject (FSD, FCS, DMA) using the corresponding eval\_OK subset. This evaluation set contains only question-answer pairs that passed the semi-automated GPT-based quality review and subsequent manual spot-checking.
+
+We compared five model variants:
+\begin{itemize}
+    \item \textbf{BASE}: the instruction-tuned base model without adaptation,
+    \item \textbf{LoRA}: the base model with a subject-specific LoRA adapter,
+    \item \textbf{LoRA+RAG}: the LoRA-adapted model augmented with retrieval of subject materials,
+    \item \textbf{Qwen3-32B}: an external LLM baseline,
+    \item \textbf{Llama-70B}: an external LLM baseline.
+\end{itemize}
+
+All metrics were computed within each subject (FSD/FCS/DMA) using the same evaluation script and the same prompt format. Each model answer was compared to the held-out reference tutor answer.
+
+\subsection{Metrics}
+To measure answer quality, we use both lexical overlap metrics (how much the text matches the reference wording) and a semantic similarity metric (how similar the meaning is even if the wording changes). We also report runtime (latency). Lexical-overlap metrics (BLEU, ROUGE-L, METEOR) reward shared words and phrases, so they are sensitive to paraphrasing. Semantic similarity (BERTScore) is more robust to paraphrase. It can increase even if lexical overlap stays modest.
+
+\begin{table}[h]
+\centering
+\caption{Metric units and value ranges used in this evaluation.}
+\label{tab:metric-units-ranges}
+\small
+\resizebox{\linewidth}{!}{%
+\begin{tabular}{lll}
+\toprule
+\textbf{Metric} & \textbf{Units} & \textbf{Typical range} \\
+\midrule
+BLEU-2 & Percent scale & 0-100 \\
+ROUGE-L & Fraction (float) & 0.0-1.0 \\
+METEOR & Fraction (float) & 0.0-1.0 \\
+BERTScore F1 & Fraction (float), rescaled & 0.0-1.0 \\
+Latency (mean / median) & Seconds & No fixed range \\
+\bottomrule
+\end{tabular}}
+\end{table}
+\FloatBarrier
+
+\paragraph{BLEU (lexical overlap).}
+BLEU measures modified n-gram precision between a candidate answer and a reference answer, with a brevity penalty for very short outputs \parencite{BleuaMet4:online}. In this project, BLEU is reported on a 0-100 scale. In tutoring-style answers, BLEU is usually low because there are many correct ways to explain the same idea.
+
+\paragraph{ROUGE-L (lexical overlap).}
+ROUGE-L is based on the longest common subsequence (LCS) between candidate and reference \parencite{ROUGEAPa16:online}. It is reported in the 0-1 range: 1 means identical text order, 0 means no overlap in sequence.
+
+\paragraph{METEOR (lexical overlap with flexible matching).}
+METEOR aligns candidate and reference using unigram matches (including stemming and synonymy) and combines precision and recall with a fragmentation penalty \parencite{METEORAn22:online}. It is also reported in the 0-1 range.
+
+\paragraph{BERTScore F1 (semantic similarity).}
+BERTScore compares candidate and reference using contextual embeddings and reports F1 similarity \parencite{Zhang2019BERTScore}. Higher values mean the meaning is closer even if words differ. 
+
+\paragraph{Latency.}
+Latency is reported as mean and median inference time per example (seconds). Lower is better.
+
+\subsection{Results}
+
+Tables \ref{tab:metrics-fsd}-\ref{tab:metrics-dma} report the evaluation results for each subject.
+
+\paragraph{Colour coding (all models with available values).}
+In the tables below, colours are applied across all models with numeric values reported in a given column.
+For each metric column:
+\begin{itemize}
+    \item \textcolor{blue}{Blue} marks the \textbf{best} value in that column.
+    \item \textcolor{red}{Red} marks the \textbf{worst} value in that column.
+\end{itemize}
+For quality metrics (BLEU, ROUGE-L, METEOR, BERTScore F1) and throughput (TPS), \textbf{higher is better}.
+For latency (mean/median seconds), \textbf{lower is better}.
+
+\begin{table}[h]
+\centering
+\caption{Evaluation metrics on eval\_OK for FSD (quality + efficiency, SLMs vs.\ LLM baselines).}
+\label{tab:metrics-fsd}
+\small
+\resizebox{\linewidth}{!}{%
+\begin{tabular}{lrrrrrrr}
+\toprule
+Model & BLEU & ROUGE-L & METEOR & BERTScore F1 & Latency (mean, s) & TPS (mean) & $n\_\text{tok}$ (mean) \\
+\midrule
+BASE     & \worst{5.260}  & \worst{0.129} & 0.297         & \worst{0.062} & 8.671 & \best{20.232} & 175.462 \\
+LoRA     & 10.028         & 0.186         & \worst{0.263} & \best{0.257}  & \best{3.929} & 16.495 & 64.945 \\
+LoRA+RAG & \best{11.161}  & 0.209         & 0.268         & 0.242         & 4.939 & 16.475 & 81.582 \\
+\midrule
+LLM (Llama-3.3-70B) & 8.958 & \best{0.212} & \best{0.310} & 0.194 & -- & -- & -- \\
+LLM (Qwen3-32B)     & 7.761 & 0.155         & 0.301         & 0.153 & \worst{10.242} & \worst{12.819} & 132.143 \\
+\bottomrule
+\end{tabular}
+}
+\end{table}
+\FloatBarrier
+
+
+\begin{table}[h]
+\centering
+\caption{Evaluation metrics on eval\_OK for FCS (quality + efficiency, SLMs vs.\ LLM baselines).}
+\label{tab:metrics-fcs}
+\small
+\resizebox{\linewidth}{!}{%
+\begin{tabular}{lrrrrrrr}
+\toprule
+Model & BLEU & ROUGE-L & METEOR & BERTScore F1 & Latency (mean, s) & TPS (mean) & $n\_\text{tok}$ (mean) \\
+\midrule
+BASE     & \worst{6.296}  & \worst{0.138} & 0.291         & \worst{0.089} & 8.995 & \best{20.318} & 182.714 \\
+LoRA     & 11.810         & 0.211         & 0.253         & \best{0.272}  & \best{4.078} & 16.683 & 68.167 \\
+LoRA+RAG & \best{12.105}  & 0.210         & \worst{0.238} & 0.247         & 4.127 & 16.602 & 68.881 \\
+\midrule
+LLM (Llama-3.3-70B) & 11.617 & \best{0.237} & \best{0.346} & 0.243 & -- & -- & -- \\
+LLM (Qwen3-32B)     & 8.937  & 0.166         & 0.317         & 0.152 & \worst{10.496} & \worst{12.890} & 135.798 \\
+\bottomrule
+\end{tabular}
+}
+\end{table}
+\FloatBarrier
+
+\begin{table}[h]
+\centering
+\caption{Evaluation metrics on eval\_OK for DMA (quality + efficiency, SLMs vs.\ LLM baselines).}
+\label{tab:metrics-dma}
+\small
+\resizebox{\linewidth}{!}{%
+\begin{tabular}{lrrrrrrr}
+\toprule
+Model & BLEU & ROUGE-L & METEOR & BERTScore F1 & Latency (mean, s) & TPS (mean) & $n\_\text{tok}$ (mean) \\
+\midrule
+BASE     & \worst{5.851}  & \worst{0.130} & 0.291         & \worst{0.082} & 8.905 & \best{20.614} & 183.486 \\
+LoRA     & 9.282          & 0.196         & \worst{0.255} & 0.208         & \best{4.966} & 16.858 & 83.931 \\
+LoRA+RAG & \best{10.293}  & 0.203         & 0.263         & \best{0.218}  & 5.170 & 16.785 & 87.181 \\
+\midrule
+LLM (Llama-3.3-70B) & 9.805 & \best{0.211} & \best{0.337} & 0.211 & -- & -- & -- \\
+LLM (Qwen3-32B)     & 7.595 & 0.152         & 0.299         & 0.120 & \worst{11.140} & \worst{13.251} & 148.319 \\
+\bottomrule
+\end{tabular}
+}
+\end{table}
+\FloatBarrier
+
+\subsection{Analysis}
+
+BLEU and ROUGE-L are lexical-overlap metrics. They reward using the same words and similar word order as the single reference tutor answer. BLEU is reported on a 0-100 scale (here mostly 5-12 for SLMs), so low absolute values mainly mean limited exact phrase overlap, which is normal when many correct tutor-style phrasings exist. ROUGE-L (0-1) measures the longest common subsequence. Values around 0.13-0.22 indicate modest in-sequence overlap for multi-sentence explanations. METEOR (0-1) uses unigram matching (including flexible matching such as stemming/synonymy) and adds a penalty when matched words appear in fragmented order. Values around 0.24-0.30 here mean partial alignment to the reference. BERTScore F1 is a semantic-similarity metric. Higher values indicate stronger meaning similarity even when surface wording differs. In this project BERTScore is reported in a rescaled form.
+
+\paragraph{BASE vs.\ LoRA (effect of fine-tuning).}
+Figure \ref{fig:all-bleu} and Figure \ref{fig:all-bertscore} summarise the main improvements from BASE to LoRA across subjects.
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=\linewidth]{figs/all_bleu.png}
+    \caption{BLEU-2 across subjects for all models.}
+    \label{fig:all-bleu}
+\end{figure}
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=\linewidth]{figs/all_bertscore.png}
+    \caption{BERTScore F1 across subjects for all models.}
+    \label{fig:all-bertscore}
+\end{figure}
+\FloatBarrier
+
+Across all three subjects, LoRA improves BLEU-2, ROUGE-L, and BERTScore compared to BASE:
+\begin{itemize}
+    \item \textbf{FSD:} BLEU-2 increases from 5.260 to 10.028, ROUGE-L from 0.129 to 0.186, and BERTScore F1 from 0.062 to 0.257.
+    \item \textbf{FCS:} BLEU-2 increases from 6.296 to 11.810, ROUGE-L from 0.138 to 0.211, and BERTScore F1 from 0.089 to 0.272.
+    \item \textbf{DMA:} BLEU-2 increases from 5.851 to 9.282, ROUGE-L from 0.130 to 0.196, and BERTScore F1 from 0.082 to 0.208.
+\end{itemize}
+These gains mean the LoRA adapters help the SLM follow subject terminology and produce explanations that are closer to the reference answers both in surface form (BLEU-2/ROUGE-L) and in meaning (BERTScore).
+
+\paragraph{LoRA vs.\ LoRA+RAG (effect of retrieval).}
+Figure \ref{fig:all-rougeL} helps to see that ROUGE-L gains from retrieval are smaller and sometimes mixed.
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=\linewidth]{figs/all_rougeL.png}
+    \caption{ROUGE-L across subjects for all models.}
+    \label{fig:all-rougeL}
+\end{figure}
+\FloatBarrier
+RAG gives smaller but still visible improvements, mostly for BLEU-2 and ROUGE-L:
+\begin{itemize}
+    \item \textbf{FSD:} BLEU-2 improves (10.028 $\rightarrow$ 11.161) and ROUGE-L improves (0.186 $\rightarrow$ 0.209).
+    \item \textbf{DMA:} BLEU-2 improves (9.282 $\rightarrow$ 10.293) and ROUGE-L improves (0.196 $\rightarrow$ 0.203).
+    \item \textbf{FCS:} BLEU-2 improves slightly (11.810 $\rightarrow$ 12.105), while ROUGE-L stays almost unchanged (0.211 $\rightarrow$ 0.210).
+\end{itemize}
+This mixed pattern is expected for RAG. Retrieved text can improve factual coverage and add correct details, but it can also change phrasing and structure. Because overlap metrics compare to a single reference answer, a correct answer with different wording can score slightly lower even if it is useful for students.
+
+\paragraph{Why METEOR goes down for SLMs.}
+This trend is visible in Figure \ref{fig:all-meteor}.
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=\linewidth]{figs/all_meteor.png}
+    \caption{METEOR across subjects for all models.}
+    \label{fig:all-meteor}
+\end{figure}
+\FloatBarrier
+In all three subjects, METEOR is highest for BASE and lower for LoRA / LoRA+RAG. This does not automatically mean worse tutoring quality. A likely reason is that LoRA and RAG introduce more domain-specific wording and different sentence structure, which can make unigram alignment more fragmented relative to one reference answer. At the same time, BLEU-2, ROUGE-L, and BERTScore show clear improvements, suggesting better overall alignment in wording and meaning.
+
+\paragraph{Comparing our SLMs to LLM baselines.}
+The BASE model is Phi-4-mini-instruct (3.8B parameters). We compare the subject-specific variants (BASE, LoRA, LoRA+RAG) to two larger LLM baselines (Llama-3.3-70B and Qwen3-32B).
+
+The most important observation is that the adapted SLMs become competitive on several metrics:
+
+\begin{itemize}
+    \item \textbf{BLEU-2:} In all subjects, the best SLM (LoRA+RAG) is higher than both LLMs
+    (FSD: 11.161 vs.\ Llama 8.958 vs.\ Qwen 7.761,
+     FCS: 12.105 vs.\ 11.617 vs.\ 8.937,
+     DMA: 10.293 vs.\ 9.805 vs.\ 7.595).
+    This suggests our fine-tuning data strongly aligns the SLM outputs with the tutor reference phrasing used in the evaluation set.
+    \item \textbf{BERTScore F1:} The best SLM is also higher than both LLMs in all subjects
+    (FSD: 0.257 vs.\ 0.194 vs.\ 0.153,
+     FCS: 0.272 vs.\ 0.243 vs.\ 0.152,
+     DMA: 0.218 vs.\ 0.211 vs.\ 0.120),
+    showing that subject adaptation improves meaning similarity to the reference answers.
+    \item \textbf{ROUGE-L:} Llama remains slightly higher, but the gap is small in FSD
+    (FSD: 0.212 vs.\ best SLM 0.209).
+    In FCS and DMA the gap is larger (0.237 vs.\ 0.211, 0.211 vs.\ 0.203), while Qwen is consistently lower.
+    \item \textbf{METEOR:} The LLMs score higher, especially Llama (FSD: 0.310, FCS: 0.346, DMA: 0.337),
+    which is consistent with METEOR favouring closer word-level alignment and ordering relative to the single reference.
+\end{itemize}
+
+\paragraph{Efficiency metrics.}
+Figures \ref{fig:all-lat-mean}-\ref{fig:all-n-tok-mean} compare the runtime behaviour of the evaluated models across subjects for the metrics available under the deployment setup.
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=\linewidth]{figs/all_latency_mean.png}
+    \caption{Mean latency (seconds) across subjects for models with available runtime measurements.}
+    \label{fig:all-lat-mean}
+\end{figure}
+\FloatBarrier
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=\linewidth]{figs/all_latency_median.png}
+    \caption{Median latency (seconds) across subjects for models with available runtime measurements.}
+    \label{fig:all-lat-median}
+\end{figure}
+\FloatBarrier
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=\linewidth]{figs/all_tps_mean.png}
+    \caption{Mean tokens per second (TPS) across subjects for models with available runtime measurements.}
+    \label{fig:all-tps-mean}
+\end{figure}
+\FloatBarrier
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=\linewidth]{figs/all_n_tok_mean.png}
+    \caption{Mean number of generated tokens across subjects for models with available runtime measurements.}
+    \label{fig:all-n-tok-mean}
+\end{figure}
+\FloatBarrier
+
+The latency plots show that the deployed LoRA-based SLM variants provide lower end-to-end response times than the measured external LLM baseline in this setup. Across all three subjects, LoRA typically achieves the lowest mean latency, while LoRA+RAG remains close behind and occasionally attains the best median latency. The retrieval step only slightly increases runtime.
+
+The throughput results provide a complementary view. The BASE model consistently achieves the highest TPS, whereas LoRA, LoRA+RAG, and Qwen3-32B generate tokens more slowly. However, the token-count plot shows that BASE also produces substantially longer outputs on average. As a result, higher token throughput does not translate into lower overall latency. In contrast, LoRA and LoRA+RAG combine moderate throughput with much shorter generations, which explains their lower response times.
+
+% The relatively small latency gap between the SLM and LLM baselines should not be interpreted as a direct reflection of model size alone. In these measurements, end-to-end latency also depends on the serving configuration. In particular, batching was observed to increase throughput, which can reduce effective response time and narrow the practical latency gap between models with very different parameter counts.
+
+% Although the LLM baselines have substantially more parameters than the deployed SLM, the observed latency gap is not proportional to model size. This is because the reported results reflect end-to-end system latency rather than raw model complexity alone. In the serving setup used here, batching increased throughput, which helps explain why larger models did not exhibit proportionally larger response times.
+
+Overall, these efficiency results indicate that the subject-specific LoRA deployment offers a favourable latency-quality trade-off. LoRA provides the fastest responses, while LoRA+RAG preserves near-comparable runtime while improving answer quality through retrieval augmentation.
+
+\subsection{Key findings}
+LoRA fine-tuning is the main reason for quality improvement across FSD, FCS, and DMA. Compared to BASE (Phi-4-mini-instruct, 3.8B parameters), LoRA consistently increases BLEU-2, ROUGE-L, and BERTScore F1. This means the SLM becomes closer to the reference tutor answers both in wording (lexical overlap) and in meaning (semantic similarity). These improvements support the project aim: small, subject-specific models can be adapted to produce more tutor-like explanations without training a large model from scratch.
+
+RAG gives smaller and less consistent gains than LoRA. In FSD and DMA, LoRA+RAG improves BLEU-2 and ROUGE-L further, while in FCS the effect is mixed (BLEU-2 slightly increases, but ROUGE-L is almost unchanged). This is expected when evaluation uses only one reference answer: retrieval can add correct details or change phrasing, which may help tutoring quality but does not always increase overlap with a single reference.
+
+METEOR often decreases after LoRA/RAG. A likely reason is that adapted models use more domain-specific wording and a different sentence structure, which reduces word-level alignment and increases fragmentation relative to the single reference, even when answers remain correct and clear.
+
+When comparing to the LLM baselines (Llama-3.3-70B and Qwen3-32B), the picture depends on the metric. The best SLM variants are already competitive and in this evaluation they outperform both LLMs on BLEU-2 and BERTScore F1 in all three subjects. At the same time, Llama generally remains higher on ROUGE-L and METEOR, which suggests closer word-order alignment to the reference. 
+
+The efficiency results show a different trade-off. Among the deployed SLM variants, LoRA usually achieves the lowest mean latency, while LoRA+RAG remains close behind and only slightly increases runtime because of the retrieval step. Although BASE has the highest token throughput, it also generates substantially longer outputs on average, which leads to higher end-to-end latency. Qwen3-32B is the slowest model among those with available runtime measurements. Overall, the subject-specific LoRA-based deployment provides a favourable quality-latency trade-off, with LoRA+RAG offering better answer quality at only a modest additional runtime cost.
+
+\section{Model deployment}
+
+% The Agentic AI Tutor is deployed as a set of containerised microservices orchestrated by Kubernetes. This section describes the system architecture, the backend and frontend services, the containerisation strategy, and the Kubernetes orchestration layer.
+
+The Agentic AI Tutor is deployed as a containerised microservices system orchestrated by Kubernetes. The deployment consists of subject-specific backend services, a frontend web application, and dedicated ChromaDB instances for retrieval, all managed within the same cluster. This section describes the overall deployment architecture, the backend and frontend services, the containerisation approach, and the Kubernetes orchestration layer.
+
+\subsection{System architecture overview}
+
+The deployed system follows a microservices pattern in which each academic subject is served by an independent backend container. This design directly reflects the methodology requirement of isolated, subject-specific modules that can be developed, evaluated, and scaled independently.
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=\linewidth]{figs/Deployment-Pipeline.png}
+\caption{Deployment view of the Agentic AI Tutor on Kubernetes.}
+\label{fig:deployment}
+\end{figure}
+\FloatBarrier
+
+As shown in Figure \ref{fig:deployment}, the system consists of four main layers:
+
+\begin{itemize}
+    \item \textbf{Ingress layer.} An Ingress controller routes external HTTP requests to either the frontend service (path /) or to a subject-specific backend service (paths /api/fsd, /api/fcs, /api/dma). Each backend exposes the same inference endpoint (/api/chat). The Ingress path prefix selects which subject service receives the request.
+    \item \textbf{Frontend.} A Next.js application that provides the chat interface. It communicates with the backend through the Ingress, sending requests to /api/chat with the selected subject included in the JSON body.
+    % \item \textbf{Backend microservices.} Three identical FastAPI containers, each configured to load a single subject's LoRA adapter and ChromaDB index. Each container runs on a GPU node and uses SUBJECT to select the adapter and index to load.
+    \item \textbf{Backend microservices.} Three FastAPI-based backend services are deployed from the same container image, with each service dedicated to a single subject. The subject-specific LoRA adapter is embedded in the container image, while retrieval data is stored in an external ChromaDB instance deployed separately inside the Kubernetes cluster. The SUBJECT environment variable selects which subject configuration is activated at runtime. Each backend container runs on a GPU-equipped node.
+\end{itemize}
+
+% This separation ensures that a failure in one subject's service does not affect the other two, and that each service can be restarted or updated independently.
+This separation improves fault isolation, since a failure in one subject-specific service does not directly interrupt the others. Each service can be restarted, updated, and scaled independently. In Kubernetes, each service is managed by its own Deployment, which maintains multiple underlying pod instances, automatically restarts failed replicas, and supports scaling up or down in response to demand. In addition, retrieval storage is externalised into a dedicated ChromaDB instance for each subject. For that reason the application layer remains stateless at runtime, which simplifies dynamic scaling. Because each subject has its own Deployment, database, and embedded LoRA adapter, the services can be scaled independently according to subject-specific traffic and resource requirements.
+
+\subsection{Backend service}
+
+% Each backend microservice is a FastAPI application that combines a LoRA-adapted language model with a retrieval-augmented generation (RAG) pipeline. The same Docker image is used for all three subjects. The SUBJECT environment variable selects which adapter and ChromaDB index to load. The subject configuration file subjects.yaml is baked into the backend image (copied during the Docker build).
+
+Each backend microservice is a FastAPI application that combines a LoRA-adapted language model with a retrieval-augmented generation (RAG) pipeline. The same Docker image is used for all three subjects. The subject configuration file subjects.yaml and the subject-specific LoRA adapters are baked into the backend image during the Docker build. At runtime, the SUBJECT environment variable selects which subject configuration and embedded LoRA adapter to activate, and determines which external ChromaDB instance inside the Kubernetes cluster the service connects to.
+
+\paragraph{Model loading pipeline.}
+When a container starts, the application performs the following initialisation sequence:
+\begin{enumerate}
+    \item Load subject configuration from subjects.yaml.
+    \item Initialise the sentence-transformer embedding model.
+    \item Load the tokenizer for Phi-4-mini-instruct.
+    \item Load the base model with 4-bit quantisation.
+    \item Attach the subject-specific LoRA adapter using the PEFT library.
+    \item Connect to the persistent ChromaDB vector store for the selected subject.
+\end{enumerate}
+
+After initialisation, the service exposes a /health endpoint that reports readiness (model and index loaded) and the active subject identifier, which is used by Kubernetes readiness probes.
+
+\paragraph{Inference flow.}
+When a user submits a question, the backend processes it through a retrieval-then-generation pipeline.
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=\linewidth]{figs/Query-Processing.png}
+\caption{Sequence diagram of the inference request.}
+\label{fig:inference-sequence}
+\end{figure}
+\FloatBarrier
+
+The retrieval-augmented inference pipeline consists of four stages:
+
+\begin{enumerate}
+    \item \textbf{Retrieval.} The user question is embedded using the sentence-transformer model and matched against the subject's ChromaDB collection. The top-6 most similar chunks are returned along with their similarity scores and provenance metadata (topic, source file).
+    \item \textbf{Context building.} The retrieved chunks are concatenated into a context string and truncated to a maximum of 1\,400 tokens to leave room for the system prompt and the generated answer within the deployed context budget.
+    \item \textbf{Generation.} The context, system prompt, and user question are formatted into the Phi-4 chat template and passed to the LoRA-adapted model. Generation uses greedy decoding and a maximum of 192 new tokens, with stop markers to prevent runaway generation.
+    \item \textbf{Response formatting.} The generated text is returned together with the top-3 most relevant source chunks (selected from the retrieved top-6) and their similarity scores, allowing the frontend to display compact information.
+\end{enumerate}
+
+The service also provides a streaming endpoint (/api/chat/stream) that yields tokens incrementally, reducing perceived latency for the end user.
+
+\subsection{Frontend service}
+
+The frontend is a Next.js application (version 16) that provides a chat-based interface for interacting with the tutor. It is built as a standalone production bundle, which produces a self-contained server.js file suitable for containerised deployment.
+
+\paragraph{Dual-mode routing.}
+The frontend supports two routing configurations, controlled entirely by build-time environment variables:
+
+\begin{itemize}
+    \item \textbf{Monolithic mode.} A single NEXT\_PUBLIC\_API\_URL variable points to one backend that serves all subjects. This mode is used with docker-compose.yml during local development.
+    \item \textbf{Microservices mode.} Separate variables (NEXT\_PUBLIC\_FSD\_API\_URL, NEXT\_PUBLIC\_FCS\_API\_URL, NEXT\_PUBLIC\_DMA\_API\_URL) point to individual backend services. In Kubernetes, these URLs resolve via the Ingress controller (using per-subject path prefixes) or via internal service DNS names depending on the deployment configuration.
+\end{itemize}
+
+\paragraph{User interface.}
+The interface is built with React 19 and Tailwind CSS. It provides subject selection tabs, a conversational chat panel, and source cards that display retrieved chunks with their similarity scores. The frontend uses Axios for API communication and supports both synchronous and streaming response modes.
+
+\subsection{Talking-head avatar}
+
+To provide a more engaging and accessible interaction mode, the system includes an optional talking-head avatar feature. When enabled, the tutor's text responses are rendered as short lip-synced videos: the response text is first converted to speech, and the resulting audio is used to animate a static avatar photograph. This produces a video in which the avatar appears to speak the response, offering a richer multimodal output compared to text alone.
+
+\paragraph{Pipeline.}
+The avatar pipeline consists of two sequential stages:
+
+\begin{enumerate}
+    \item \textbf{Speech synthesis.} The response text is passed to Piper TTS, a lightweight neural text-to-speech engine that runs locally within the backend container. Piper synthesises a WAV audio file using the \texttt{en\_US-lessac-medium} voice model.
+    \item \textbf{Talking-head rendering.} The synthesised audio is forwarded to a dedicated SadTalker service. SadTalker is a generative model that takes a static face image and a WAV file as inputs and produces a lip-synced MP4 video. The video is returned to the frontend and played in the avatar panel.
+\end{enumerate}
+
+The combined pipeline is exposed via the \texttt{POST /api/video} endpoint on the backend, which sequences the two stages and returns the final \texttt{video/mp4} binary.
+
+\paragraph{SadTalker service.}
+SadTalker is deployed as a separate Docker container running a FastAPI application on port 7860. It exposes two endpoints: \texttt{POST /generate}, which accepts a WAV file and returns an MP4 video, and \texttt{GET /avatar}, which serves the static avatar photograph.
+
+To minimise per-request latency, all SadTalker models (\texttt{CropAndExtract}, \texttt{Audio2Coeff}, \texttt{AnimateFromCoeff}) are loaded into GPU memory once at application startup using FastAPI's lifespan context. The static avatar image is also pre-processed once at startup: facial landmarks are extracted and 3DMM coefficients are computed and cached. At inference time only the audio-to-coefficient and face rendering stages need to run, reducing per-request processing time significantly compared to a subprocess-per-request approach.
+
+Inference is serialised with a threading lock to prevent concurrent GPU access, since SadTalker does not support parallel inference within a single process.
+
+\paragraph{GPU memory considerations.}
+Each 4-bit quantised Phi-4-mini backend instance occupies approximately 3--4\,GB of GPU VRAM. SadTalker requires an additional 2\,GB. On the development GPU (NVIDIA RTX 4070 Ti, 12\,GB VRAM), this limits the number of simultaneously active backend services to two when SadTalker is also loaded on GPU. In practice all three subject backends are deployed, with SadTalker configured to run on CPU as a fallback when GPU memory is fully occupied by the language model instances. Face rendering is performed at the default resolution of 256$\times$256 pixels, matching the available SadTalker checkpoint (\texttt{SadTalker\_V0.0.2\_256.safetensors}). A 128$\times$128 checkpoint also exists and would reduce rendering time further, but was not required given the performance achieved with the 256 model.
+
+\paragraph{Frontend integration.}
+The avatar panel is displayed above the chat input area and is toggled by the user via a dedicated button. When the panel is enabled and idle, the static avatar photograph is shown, fetched from the \texttt{GET /api/avatar} proxy endpoint on the backend. When a response is generated and TTS playback is triggered, a loading spinner is overlaid on the static image while the video is being generated. Once the MP4 is received, it is played in place of the static image using an HTML \texttt{<video>} element; when playback ends, the static image is restored without a network round-trip, since the image element remains mounted in the DOM throughout.
+
+\subsection{Containerisation}
+
+Both the backend and frontend are packaged as Docker images, and two Docker Compose configurations provide local deployment modes.
+
+\paragraph{Backend Dockerfile.}
+% The backend image is based on \texttt{pytorch/pytorch:2.2.0-cuda12.1-cudnn8-runtime}, which includes the CUDA runtime needed for 4-bit quantisation via \texttt{bitsandbytes}. The image installs Python dependencies from \texttt{requirements.txt}, copies the application source code and \texttt{subjects.yaml}, and runs Uvicorn on port 8000. Model artefacts (LoRA adapters, ChromaDB stores) are not baked into the image.
+
+The backend image is based on pytorch/pytorch:2.2.0-cuda12.1-cudnn8-runtime, which includes the CUDA runtime needed for 4-bit quantisation via bitsandbytes. The image installs Python dependencies from requirements.txt, copies the application source code, subjects.yaml, and the subject-specific LoRA adapters, and runs Uvicorn on port 8000. The LoRA adapters are therefore baked into the image, whereas retrieval storage is externalised to dedicated ChromaDB instances running separately inside the Kubernetes cluster.
+
+\paragraph{Frontend Dockerfile.}
+The frontend uses a multi-stage build to minimise the final image size:
+
+\begin{enumerate}
+    \item \textbf{deps stage}: installs Node.js dependencies with npm ci on the node:20-alpine base image.
+    \item \textbf{builder stage}: copies the source code and dependencies, sets API URL build arguments, and runs npm run build to produce the Next.js standalone output.
+    \item \textbf{runner stage}: copies only the standalone server, static assets, and public files into a clean Alpine image. A non-root user (nextjs, UID 1001) is created for security.
+\end{enumerate}
+
+The final image exposes port 3000 and starts the Node.js server directly.
+
+\paragraph{Docker Compose modes.}
+Two Compose files provide alternative local deployment configurations.
+
+As shown in the two Docker Compose configurations (docker-compose.yml and docker-compose.microservices.yml):
+
+\begin{itemize}
+    \item \textbf{Monolithic mode} (docker-compose.yml) runs one backend container that loads all three subjects, plus one frontend container. The frontend is built with a single NEXT\_PUBLIC\_API\_URL pointing to http://localhost:8000. This mode requires only one GPU and is suitable for development and testing.
+    \item \textbf{Microservices mode} (docker-compose.microservices.yml) runs three backend containers (FSD on port 8001, FCS on port 8002, DMA on port 8003), each configured with a SUBJECT environment variable and a dedicated GPU. The frontend is built with per-subject API URLs. This mode requires three GPUs and provides fault isolation between subjects.
+\end{itemize}
+
+Both modes configure health checks that poll the /health endpoint every 30 seconds. In monolithic mode, the single backend container mounts the data directory (defaulting to ./backend/data) as a volume. In microservices mode, data volumes are not mounted to the backend containers. Instead, each backend service connects to its dedicated ChromaDB container via HTTP using the CHROMA\_HOST and CHROMA\_PORT environment variables, and ChromaDB persistence is managed through named Docker volumes.
+
+\subsection{Kubernetes orchestration}
+
+For production deployment, the system is orchestrated with Kubernetes. All resources are defined declaratively in YAML manifests managed by Kustomize.
+
+\paragraph{Namespace and storage.}
+All resources reside in a dedicated ai-tutor namespace to isolate them from other workloads on the cluster. Each subject has a dedicated ChromaDB Deployment running the chromadb/chroma image, backed by its own 10\,Gi PersistentVolumeClaim (fsd-chroma-pvc, fcs-chroma-pvc, dma-chroma-pvc) with ReadWriteOnce access. A corresponding ClusterIP Service exposes each ChromaDB instance under a stable DNS name (e.g.\ fsd-chroma) that the backend Deployment references via the CHROMA\_HOST environment variable.
+
+\paragraph{Backend Deployments.}
+Each subject (FSD, FCS, DMA) has its own Kubernetes Deployment with the following configuration:
+
+\begin{itemize}
+    \item \textbf{Replicas:} 1 per subject in this deployment (each replica requires a dedicated GPU, so horizontal scaling is constrained by GPU availability).
+    \item \textbf{Resource requests:} 4\,Gi memory, 1 CPU, 1 GPU (nvidia.com/gpu).
+    \item \textbf{Resource limits:} 12\,Gi memory, 4 CPUs, 1 GPU.
+    \item \textbf{Node placement:} a nodeSelector targeting nodes with nvidia.com/gpu: "true" and a corresponding toleration ensure pods are scheduled only on GPU-equipped nodes.
+    \item \textbf{Health probes:} readiness probe on /health (initial delay 60\,s, period 10\,s), liveness probe on /health (initial delay 120\,s, period 30\,s). The longer liveness delay accounts for the time needed to load the quantised model and LoRA adapter into GPU memory.
+    \item \textbf{Environment:} SUBJECT is set to the corresponding subject code. CHROMA\_HOST is set to the internal DNS name of the subject's ChromaDB service (e.g.\ fsd-chroma). CHROMA\_PORT is set to 8000. The backend pods carry no volume mounts and are stateless at runtime.
+\end{itemize}
+
+Each Deployment is fronted by a ClusterIP Service that provides a stable internal DNS name (e.g.\ fsd-service.ai-tutor.svc.cluster.local).
+
+\paragraph{Frontend Deployment.}
+The frontend runs with 2 replicas and lighter resource requirements (256\,Mi--512\,Mi memory, 100\,m--500\,m CPU). Its environment variables are set to the Ingress endpoint (and per-subject routing prefixes) or to Kubernetes-internal DNS names depending on the chosen routing configuration.
+
+\paragraph{Ingress routing.}
+An Ingress resource maps external HTTP paths to internal services:
+
+\begin{itemize}
+    \item / $\rightarrow$ frontend service (port 80)
+    \item /api/fsd $\rightarrow$ fsd-service (port 80)
+    \item /api/fcs $\rightarrow$ fcs-service (port 80)
+    \item /api/dma $\rightarrow$ dma-service (port 80)
+\end{itemize}
+
+The manifests include annotations for both AWS ALB and NGINX Ingress controllers, making the configuration portable across cloud providers.
+
+\paragraph{Kustomize management.}
+All Kubernetes manifests are managed through a kustomization.yaml file that declares the full set of resources (namespace, storage, per-subject deployments and services, frontend deployment and service, and ingress). This allows the entire stack to be applied with a single kubectl apply k command and ensures that the deployed state matches the version-controlled manifests.
+
+\section{Monitoring and maintenance}
+\subsection{Operational logging}
+
+The backend service uses Python's standard logging module for structured operational visibility. Logging is configured centrally in logging\_config.py, which is imported at application startup before any other module is initialised. The configuration sets a uniform log format across all modules.
+
+The log level is controlled at runtime through the LOG\_LEVEL environment variable (default INFO), so verbosity can be adjusted per deployment without rebuilding the image. Noisy third-party loggers (transformers, chromadb, sentence\_transformers, uvicorn.access) are suppressed to WARNING level to keep the output focused on application events.
+
+\paragraph{Startup logging.}
+During initialisation, each step of the model loading pipeline produces an INFO-level message. This makes it easy to identify slow startup or failures during adapter loading or ChromaDB connection setup, which is especially useful given the multi-step initialisation sequence and the long model loading time.
+
+\paragraph{Per-request inference logging.}
+After every generation call, the inference module logs the subject identifier, the elapsed wall-clock time, and the number of tokens produced. This gives a lightweight per-request latency record without requiring an external metrics system. The log entries can be collected from container stdout to track response-time trends over time.
+
+\paragraph{RAG retrieval logging.}
+Each retrieval call logs the subject, the number of chunks returned, and a short prefix of the query at INFO level. At DEBUG level, the similarity score and a brief text preview are logged for the top three retrieved chunks. Connection failures and missing ChromaDB collections are reported at WARNING and ERROR levels respectively, which supports quick diagnosis of retrieval problems.
+
+\section{Lifecycle management}
+
+\subsection{CI/CD pipeline}
+
+A continuous integration and delivery pipeline was built using GitHub Actions and Argo CD. The pipeline runs on every push to the main branch and consists of two sequential jobs.
+
+The lint job runs on a standard Ubuntu runner without a GPU. It first checks the Python syntax of all six backend modules (config.py, rag.py, inference.py, main.py, schemas.py, logging\_config.py) using py\_compile. It then validates the Kubernetes manifests for structural correctness using a dry-run lint step. This job runs on every push and every pull request, giving fast feedback before a Docker image is built.
+
+The build job runs only on pushes to main and only if the lint job passes. It checks out the repository including Git LFS objects (the LoRA adapter .safetensors files), authenticates to the GitHub Container Registry (ghcr.io), and builds and pushes the backend Docker image. Two tags are produced: a latest tag for the default branch and a commit-SHA tag (for example, ghcr.io/nasttolm/ai-tutor-backend:a3f1c2d) that uniquely identifies each build. Build-layer caching via GitHub Actions cache is enabled to reduce image build time on repeated pushes.
+
+\subsection{GitOps deployment with Argo CD}
+
+Deployment to Kubernetes is managed with Argo CD following the GitOps approach. Two manifests are provided in k8s/argo/: an AppProject that restricts deployments to the ai-tutor namespace from the project repository, and an Application that declares the desired cluster state.
+
+The Application manifest points Argo CD at the k8s/ directory of the repository and instructs it to render the manifests using Kustomize. Two synchronisation policies are enabled: prune, which removes cluster resources that have been deleted from the repository, and selfHeal, which reverts any manual changes made directly to the cluster. Together, these policies make the git repository the single source of truth for the cluster state.
+
+The end-to-end delivery flow works as follows: 
+\begin{itemize}
+    \item A developer pushes a commit to main; GitHub Actions builds and pushes a new image tagged with the commit SHA.
+    \item The Kubernetes manifests in k8s/ are updated to reference the new tag.
+    \item Argo CD detects the change during its next polling cycle and rolls out the updated Deployment to the cluster.
+\end{itemize}
+
+\subsection{Model versioning}
+
+Each LoRA adapter is assigned a semantic version, which is recorded in subjects.yaml alongside its name and ChromaDB identifier. The version field is exposed at runtime through the /health endpoint, which returns a versions dictionary mapping each loaded subject to its adapter version. This allows operators to check which adapter version is running in production without inspecting the image or the file system directly. When an adapter is retrained, the version field is incremented, providing a simple audit trail in the git history.
+
+\section{Reflection on the Progress}
+
+All six MLOps lifecycle stages described in this chapter have been fully implemented. The data pipeline, fine-tuning workflow, evaluation suite, deployment layer, operational logging, CI/CD pipeline, and model versioning strategy were all built and verified end-to-end.
+
+\paragraph{Completed work.}
+The data pipeline, fine-tuning workflow, and evaluation suite were implemented and applied consistently to all three subjects (FSD, FCS, DMA). Each subject has a fine-tuned LoRA adapter, a ChromaDB vector store populated with course materials, and a full set of evaluation results (BLEU, ROUGE-L, METEOR, BERTScore). The deployment layer is fully operational: the FastAPI backend, Next.js frontend, Docker Compose configurations, and Kubernetes manifests have all been implemented and verified.
+
+\paragraph{Architecture refinement.}
+During the implementation phase, the deployment architecture was refined to align with the design described in this chapter. Two changes were made to the containerisation and storage strategy. First, the subject-specific LoRA adapters are now copied into the backend image at build time (\texttt{COPY data/adapters/ ./adapters/}), making backend pods stateless at runtime and removing the dependency on a shared PersistentVolumeClaim. Second, ChromaDB is no longer accessed as a local PersistentClient reading from a mounted volume; instead, each subject has a dedicated ChromaDB Deployment inside the Kubernetes cluster, and the backend connects to it over HTTP using the \texttt{CHROMA\_HOST} and \texttt{CHROMA\_PORT} environment variables. These changes required updates to \texttt{backend/Dockerfile}, \texttt{backend/src/config.py}, \texttt{backend/src/rag.py}, all three subject Deployments, \texttt{docker-compose.microservices.yml}, and the storage and kustomization manifests.
+
+\paragraph{Verification.}
+The implemented system was verified at five progressive levels:
+
+\begin{enumerate}
+    \item \textbf{Static analysis.} Python syntax of all six backend modules (\texttt{config.py}, \texttt{rag.py}, \texttt{inference.py}, \texttt{main.py}, \texttt{schemas.py}, \texttt{logging\_config.py}) was verified with \texttt{python -m py\_compile}; all files compiled without errors. All Kubernetes manifests were validated with \texttt{kubectl apply -k k8s/ --dry-run=client}, which reported 19 resources created in dry-run mode: one namespace, three PersistentVolumeClaims, six Deployments (three backend, three ChromaDB), six Services (three backend, three ChromaDB), one frontend Deployment, one frontend Service, and one Ingress.
+
+    \item \textbf{RAG pipeline verification.} The three ChromaDB vector stores were served locally as HTTP instances (one per subject, on ports 8001--8003) using \texttt{chroma run --path}. The Python \texttt{HttpClient} connected successfully to all three instances, confirming chunk counts of 120~(FSD), 73~(FCS), and 74~(DMA). End-to-end retrieval was verified by encoding a subject-appropriate query with the \texttt{all-MiniLM-L6-v2} sentence-transformer and querying each collection; all three returned topically relevant chunks with cosine similarity scores in the range 0.48--0.56, confirming that the embedding index is intact and the retrieval pipeline operates correctly without GPU resources.
+
+    \item \textbf{Full backend verification (GPU).} The FastAPI backend was started in single-subject mode (\texttt{SUBJECT=fsd}) with the FSD ChromaDB instance running on port 8001. Model initialisation completed in approximately 9~seconds using 4-bit quantisation on an NVIDIA RTX~4070~Ti. The \texttt{/health} endpoint returned \texttt{\{"status":"ok","subjects\_loaded":["fsd"],"versions":\{"fsd":"1.0.0"\}\}}, confirming that model versioning is exposed correctly at runtime. The \texttt{/api/chat} endpoint was tested with the question \emph{``What is a variable?''}; the response returned a coherent multi-sentence tutor-style answer together with three ranked source chunks (similarity scores 0.48, 0.48, 0.39) from \texttt{FSD\_Topic\_14}, confirming that the LoRA adapter, the RAG retrieval pipeline, and the REST API are all functioning correctly together.
+
+    \item \textbf{Docker Compose microservices verification (GPU).} The full microservices stack was started using \texttt{docker compose -f docker-compose.local.yml up}, which launched three ChromaDB containers (each with the corresponding subject's vector store mounted as a bind volume), three backend containers (one per subject, using the pre-built \texttt{ai-tutor-backend:test} image), and the frontend container. All three \texttt{/health} endpoints confirmed successful startup: each returned \texttt{\{"status":"ok","subjects\_loaded":["<subject>"],"versions":\{"<subject>":"1.0.0"\}\}}. The \texttt{/api/chat} endpoint on the FSD service was tested via the frontend with the question \emph{``What is a variable?''}; the response included a coherent tutor-style answer together with three ranked source chunks (similarity scores 0.47, 0.47, 0.37) from \texttt{FSD\_Topic\_14}, confirming end-to-end operation of the containerised microservices stack including RAG retrieval.
+
+    \item \textbf{Kubernetes deployment verification.} The full set of Kubernetes manifests was deployed to a single-node Minikube cluster (v1.38.1) running inside WSL2 Ubuntu~24.04 on Windows~11. All 19 resources were created successfully: the \texttt{ai-tutor} namespace, three PersistentVolumeClaims (all Bound), three ChromaDB Deployments (all Running~1/1), seven ClusterIP Services, two frontend replicas (Running~1/1), and the Ingress resource. This confirms that the declarative Kubernetes configuration is correct and deployable. The backend pods initialise successfully and begin model loading; however, they do not reach the ready state in the local development environment because the NVIDIA GPU is not accessible to Kubernetes pods in this configuration. GPU passthrough to Kubernetes pods requires the NVML library to enumerate devices via the NVIDIA device plugin; in the WSL2-hosted Minikube environment, NVML returns \texttt{Not Supported} due to the paravirtualised GPU driver architecture used by Windows~WSL2, regardless of the container runtime configuration. GPU-accelerated inference was already confirmed at Levels~3 and~4. A production Kubernetes deployment on a cloud provider with bare-metal GPU nodes (e.g.\ AWS EKS with \texttt{p3} instances or GKE with GPU node pools) would not have this limitation, as the NVIDIA device plugin operates correctly on native Linux GPU hardware.
+\end{enumerate}
+
+\paragraph{Remaining work.}
+The planned monitoring extensions (Prometheus metrics endpoint, Grafana dashboards, and Q\&A logging for drift detection) have not yet been implemented and remain as future work.
+

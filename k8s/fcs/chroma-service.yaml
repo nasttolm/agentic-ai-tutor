@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: fcs-chroma
+  namespace: ai-tutor
+  labels:
+    app: fcs-chroma
+    subject: fcs
+spec:
+  selector:
+    app: fcs-chroma
+  ports:
+    - port: 8000
+      targetPort: 8000

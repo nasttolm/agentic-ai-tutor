@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: dma-chroma
+  namespace: ai-tutor
+  labels:
+    app: dma-chroma
+    subject: dma
+spec:
+  selector:
+    app: dma-chroma
+  ports:
+    - port: 8000
+      targetPort: 8000

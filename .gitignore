@@ -1,0 +1,25 @@
+__pycache__/
+.ipynb_checkpoints/
+.env
+.DS_Store
+venv/
+node_modules/
+
+# big artifacts — adapters tracked via Git LFS (see .gitattributes)
+backend/data/rag/
+backend/data/metrics_outputs/
+backend/data/eval_qa/
+/adapters/
+rag/**/chroma_store/
+*.bin
+
+# Piper TTS models (download via download_piper_model.py)
+backend/data/piper/*.onnx
+backend/data/piper/*.onnx.json
+
+# plans / drafts
+DEVELOPMENT_PLAN.md
+
+# tools / cache
+.claude/
+notebooks/unsloth_compiled_cache/
