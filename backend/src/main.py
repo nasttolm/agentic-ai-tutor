@@ -23,8 +23,10 @@ from .schemas import (
     HealthResponse,
     Source,
     TTSRequest,
+    VideoRequest,
 )
 from .tts import init_tts, is_tts_available, synthesize
+from .sadtalker import is_sadtalker_available, generate_video, SADTALKER_URL
 from .rag import (
     init_embedder,
     init_rag_client,
@@ -114,6 +116,7 @@ def health():
         subjects_loaded=loaded,
         versions=versions,
         tts_available=is_tts_available(),
+        video_available=is_sadtalker_available(),
     )
 
 
@@ -173,6 +176,42 @@ def chat_stream(req: ChatRequest):
             yield token
 
     return StreamingResponse(generate(), media_type="text/plain")
+
+
+@app.get("/api/avatar")
+def get_avatar():
+    """Proxy avatar image from SadTalker service. Returns image/jpeg."""
+    if not is_sadtalker_available():
+        raise HTTPException(status_code=503, detail="SadTalker not available")
+    try:
+        import httpx
+        resp = httpx.get(f"{SADTALKER_URL}/avatar", timeout=10)
+        resp.raise_for_status()
+        return Response(content=resp.content, media_type="image/jpeg")
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail="Avatar not available") from exc
+
+
+@app.post("/api/video")
+def talking_video(req: VideoRequest):
+    """Generate talking-head video. Returns video/mp4 binary.
+
+    Requires both TTS (Piper) and SadTalker service (SADTALKER_URL).
+    Returns 503 when either is unavailable.
+    """
+    if not is_tts_available():
+        raise HTTPException(status_code=503, detail="TTS not available")
+    if not is_sadtalker_available():
+        raise HTTPException(status_code=503, detail="SadTalker not available")
+
+    try:
+        audio_bytes = synthesize(req.text)
+        video_bytes = generate_video(audio_bytes)
+    except Exception as exc:
+        logger.error("Video generation failed: %s", exc)
+        raise HTTPException(status_code=500, detail="Video generation failed") from exc
+
+    return Response(content=video_bytes, media_type="video/mp4")
 
 
 @app.post("/api/tts")

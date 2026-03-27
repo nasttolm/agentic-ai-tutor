@@ -22,9 +22,15 @@ export default function Home() {
   const [loadingAudioIndex, setLoadingAudioIndex] = useState<number | null>(null);
   const currentAudioRef = useRef<HTMLAudioElement | null>(null);
 
-  // Load TTS preference from localStorage (client-side only)
+  // Avatar state
+  const [avatarEnabled, setAvatarEnabled] = useState(false);
+  const [avatarVideoUrl, setAvatarVideoUrl] = useState<string | null>(null);
+  const [avatarLoading, setAvatarLoading] = useState(false);
+
+  // Load preferences from localStorage (client-side only)
   useEffect(() => {
     setTtsEnabled(localStorage.getItem('ttsEnabled') === 'true');
+    setAvatarEnabled(localStorage.getItem('avatarEnabled') === 'true');
   }, []);
 
   useEffect(() => {
@@ -34,11 +40,7 @@ export default function Home() {
         setActiveTab(data[0].id);
         const initialStates: Record<string, TabState> = {};
         data.forEach((subject) => {
-          initialStates[subject.id] = {
-            messages: [],
-            input: '',
-            loading: false,
-          };
+          initialStates[subject.id] = { messages: [], input: '', loading: false };
         });
         setTabStates(initialStates);
       }
@@ -47,7 +49,6 @@ export default function Home() {
 
   const currentState = tabStates[activeTab] || { messages: [], input: '', loading: false };
 
-  // Auto-scroll to bottom when messages change
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [currentState.messages, currentState.loading]);
@@ -61,32 +62,58 @@ export default function Home() {
     setLoadingAudioIndex(null);
   }, []);
 
+  const clearAvatarVideo = useCallback(() => {
+    setAvatarVideoUrl(prev => {
+      if (prev) URL.revokeObjectURL(prev);
+      return null;
+    });
+    setAvatarLoading(false);
+  }, []);
+
   const playAudio = useCallback(async (text: string, subject: string, index: number) => {
-    // Toggle off if already playing this message
     if (playingIndex === index) {
       stopCurrentAudio();
+      clearAvatarVideo();
       return;
     }
     stopCurrentAudio();
-    setLoadingAudioIndex(index);
-    try {
-      const blob = await api.tts(text, subject);
-      const url = URL.createObjectURL(blob);
-      const audio = new Audio(url);
-      currentAudioRef.current = audio;
-      setLoadingAudioIndex(null);
+    clearAvatarVideo();
+
+    if (avatarEnabled) {
+      // Avatar mode: generate video (MP4 contains audio)
+      setAvatarLoading(true);
       setPlayingIndex(index);
-      audio.onended = () => {
+      try {
+        const blob = await api.video(text, subject);
+        const url = URL.createObjectURL(blob);
+        setAvatarVideoUrl(url);
+      } catch {
         setPlayingIndex(null);
-        URL.revokeObjectURL(url);
-        currentAudioRef.current = null;
-      };
-      audio.play();
-    } catch {
-      setLoadingAudioIndex(null);
-      setPlayingIndex(null);
+      } finally {
+        setAvatarLoading(false);
+      }
+    } else {
+      // Normal TTS mode
+      setLoadingAudioIndex(index);
+      try {
+        const blob = await api.tts(text, subject);
+        const url = URL.createObjectURL(blob);
+        const audio = new Audio(url);
+        currentAudioRef.current = audio;
+        setLoadingAudioIndex(null);
+        setPlayingIndex(index);
+        audio.onended = () => {
+          setPlayingIndex(null);
+          URL.revokeObjectURL(url);
+          currentAudioRef.current = null;
+        };
+        audio.play();
+      } catch {
+        setLoadingAudioIndex(null);
+        setPlayingIndex(null);
+      }
     }
-  }, [playingIndex, stopCurrentAudio]);
+  }, [playingIndex, stopCurrentAudio, clearAvatarVideo, avatarEnabled]);
 
   const toggleTts = () => {
     const next = !ttsEnabled;
@@ -95,8 +122,16 @@ export default function Home() {
     if (!next) stopCurrentAudio();
   };
 
+  const toggleAvatar = () => {
+    const next = !avatarEnabled;
+    setAvatarEnabled(next);
+    localStorage.setItem('avatarEnabled', String(next));
+    if (!next) clearAvatarVideo();
+  };
+
   const handleTabChange = (tabId: string) => {
     stopCurrentAudio();
+    clearAvatarVideo();
     setActiveTab(tabId);
   };
 
@@ -114,11 +149,7 @@ export default function Home() {
     const userMessage: Message = { role: 'user', content: input };
     const newMessages = [...messages, userMessage];
 
-    updateTabState(activeTab, {
-      messages: newMessages,
-      input: '',
-      loading: true,
-    });
+    updateTabState(activeTab, { messages: newMessages, input: '', loading: true });
 
     try {
       const response = await api.chat({
@@ -134,22 +165,15 @@ export default function Home() {
       };
 
       const updatedMessages = [...newMessages, assistantMessage];
-      updateTabState(activeTab, {
-        messages: updatedMessages,
-        loading: false,
-      });
+      updateTabState(activeTab, { messages: updatedMessages, loading: false });
 
       if (ttsEnabled) {
         playAudio(response.answer, activeTab, newMessages.length);
       }
     } catch (error) {
       console.error('Chat error:', error);
-      const errorMessage: Message = {
-        role: 'assistant',
-        content: 'Sorry, there was an error. Please try again.',
-      };
       updateTabState(activeTab, {
-        messages: [...newMessages, errorMessage],
+        messages: [...newMessages, { role: 'assistant', content: 'Sorry, there was an error. Please try again.' }],
         loading: false,
       });
     }
@@ -157,12 +181,7 @@ export default function Home() {
 
   return (
     <div className="flex flex-col h-screen bg-white">
-      {/* Header */}
-      <SubjectTabs
-        subjects={subjects}
-        activeTab={activeTab}
-        onTabChange={handleTabChange}
-      />
+      <SubjectTabs subjects={subjects} activeTab={activeTab} onTabChange={handleTabChange} />
 
       {/* Chat Messages */}
       <div className="flex-1 overflow-y-auto">
@@ -179,8 +198,8 @@ export default function Home() {
                 <ChatMessage
                   key={index}
                   message={message}
-                  isPlaying={playingIndex === index}
-                  isLoadingAudio={loadingAudioIndex === index}
+                  isPlaying={playingIndex === index && !avatarLoading}
+                  isLoadingAudio={loadingAudioIndex === index || (avatarEnabled && avatarLoading && playingIndex === index)}
                   onPlayAudio={
                     message.role === 'assistant'
                       ? () => playAudio(message.content, activeTab, index)
@@ -192,9 +211,41 @@ export default function Home() {
               <div ref={messagesEndRef} />
             </div>
           )}
-
         </div>
       </div>
+
+      {/* Avatar Panel — shown above input when avatar mode is ON */}
+      {avatarEnabled && (
+        <div className="border-t border-gray-100 py-4 flex justify-center bg-white">
+          <div className="w-44 h-44 rounded-2xl overflow-hidden bg-gray-50 border border-gray-200 relative">
+            <img
+              src={api.avatarUrl(activeTab)}
+              alt="Avatar"
+              className="w-full h-full object-cover"
+              onError={(e) => {
+                (e.target as HTMLImageElement).style.display = 'none';
+              }}
+            />
+            {avatarVideoUrl && (
+              <video
+                src={avatarVideoUrl}
+                autoPlay
+                className="absolute inset-0 w-full h-full object-cover"
+                onEnded={() => {
+                  clearAvatarVideo();
+                  setPlayingIndex(null);
+                }}
+              />
+            )}
+            {avatarLoading && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/30">
+                <span className="w-8 h-8 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                <span className="text-xs text-white/80 mt-2">Generating...</span>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Input */}
       <ChatInput
@@ -204,6 +255,8 @@ export default function Home() {
         disabled={currentState.loading}
         ttsEnabled={ttsEnabled}
         onToggleTts={toggleTts}
+        avatarEnabled={avatarEnabled}
+        onToggleAvatar={toggleAvatar}
       />
     </div>
   );

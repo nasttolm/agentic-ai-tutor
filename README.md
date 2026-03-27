@@ -148,6 +148,80 @@ agentic-ai-tutor/
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
+## Quick Start
+
+### Prerequisites
+- Docker Desktop (running)
+- NVIDIA GPU with CUDA 12.1 (for backend inference)
+- 16GB+ RAM, 50GB+ disk
+
+---
+
+### Mode 1 — Microservices (recommended for demo)
+
+Runs all 8 containers: 3 FastAPI backends, 3 ChromaDB instances, SadTalker, Frontend.
+
+```bash
+docker compose -f docker-compose.microservices.yml up --build
+```
+
+- Frontend: http://localhost:3000
+- FSD API: http://localhost:8001/health
+- FCS API: http://localhost:8002/health
+- DMA API: http://localhost:8003/health
+- SadTalker: http://localhost:7860/health
+
+---
+
+### Mode 2 — Monolithic (single backend, all 3 subjects)
+
+```bash
+docker compose up --build
+```
+
+- Frontend: http://localhost:3000
+- Backend: http://localhost:8000/health
+
+---
+
+### Mode 3 — Local development (no Docker, hot reload)
+
+Requires Python venv and ChromaDB installed locally.
+
+```bash
+# Terminal 1 — ChromaDB for one subject
+chroma run --path ./backend/data/rag/fsd/chroma_store --port 8001
+
+# Terminal 2 — Backend
+cd backend
+source venv/Scripts/activate   # Windows (Git Bash)
+# source venv/bin/activate      # Linux/Mac
+SUBJECT=fsd CHROMA_HOST=localhost CHROMA_PORT=8001 \
+TTS_ENABLED=true SADTALKER_URL=http://localhost:7860 \
+uvicorn src.main:app --reload
+
+# Terminal 3 — Frontend
+cd frontend
+npm run dev
+```
+
+- Frontend: http://localhost:3000
+- Backend: http://localhost:8000
+
+---
+
+### Mode 4 — Kubernetes (Minikube)
+
+```bash
+minikube start --driver=docker --gpus=all --memory=8192
+kubectl apply -k k8s/
+kubectl get pods -n ai-tutor
+```
+
+See `k8s/` for full manifests.
+
+---
+
 ## Author
 
 **Anastasia Tolmacheva**

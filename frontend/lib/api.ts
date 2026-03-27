@@ -77,4 +77,28 @@ export const api = {
     const response = await axios.post(`${apiUrl}/api/chat`, request);
     return response.data;
   },
+
+  async tts(text: string, subject: string): Promise<Blob> {
+    const apiUrl = getApiUrl(subject);
+    const response = await axios.post(
+      `${apiUrl}/api/tts`,
+      { text, subject },
+      { responseType: 'blob' },
+    );
+    return response.data;
+  },
+
+  async video(text: string, subject: string): Promise<Blob> {
+    const apiUrl = getApiUrl(subject);
+    const response = await axios.post(
+      `${apiUrl}/api/video`,
+      { text, subject },
+      { responseType: 'blob' },
+    );
+    return response.data;
+  },
+
+  avatarUrl(subject?: string): string {
+    return `${getApiUrl(subject)}/api/avatar`;
+  },
 };

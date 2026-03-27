@@ -10,26 +10,46 @@ services:
     image: chromadb/chroma:latest
     container_name: ai-tutor-fsd-chroma
     volumes:
-      - fsd-chroma-data:/chroma/chroma
+      - ./backend/data/rag/fsd/chroma_store:/data
     restart: unless-stopped
 
   fcs-chroma:
     image: chromadb/chroma:latest
     container_name: ai-tutor-fcs-chroma
     volumes:
-      - fcs-chroma-data:/chroma/chroma
+      - ./backend/data/rag/fcs/chroma_store:/data
     restart: unless-stopped
 
   dma-chroma:
     image: chromadb/chroma:latest
     container_name: ai-tutor-dma-chroma
     volumes:
-      - dma-chroma-data:/chroma/chroma
+      - ./backend/data/rag/dma/chroma_store:/data
     restart: unless-stopped
 
   # ============================================================================
   # Backend Services (one per subject)
   # ============================================================================
+  sadtalker:
+    build:
+      context: ./backend/data/sadtalker
+    container_name: ai-tutor-sadtalker
+    ports:
+      - "7860:7860"
+    environment:
+      - SADTALKER_DEVICE=cuda
+    volumes:
+      - ./backend/data/sadtalker/checkpoints:/sadtalker/checkpoints
+      - ./backend/data/sadtalker/gfpgan:/app/gfpgan
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    restart: unless-stopped
+
   fsd-service:
     build: ./backend
     container_name: ai-tutor-fsd
@@ -39,8 +59,14 @@ services:
       - SUBJECT=fsd
       - CHROMA_HOST=fsd-chroma
       - CHROMA_PORT=8000
+      - SADTALKER_URL=http://sadtalker:7860
+      - SADTALKER_TIMEOUT=600
+      - TTS_ENABLED=true
+    volumes:
+      - ./backend/data/piper:/app/data/piper
     depends_on:
       - fsd-chroma
+      - sadtalker
     deploy:
       resources:
         reservations:
@@ -64,8 +90,14 @@ services:
       - SUBJECT=fcs
       - CHROMA_HOST=fcs-chroma
       - CHROMA_PORT=8000
+      - SADTALKER_URL=http://sadtalker:7860
+      - SADTALKER_TIMEOUT=600
+      - TTS_ENABLED=true
+    volumes:
+      - ./backend/data/piper:/app/data/piper
     depends_on:
       - fcs-chroma
+      - sadtalker
     deploy:
       resources:
         reservations:
@@ -89,8 +121,14 @@ services:
       - SUBJECT=dma
       - CHROMA_HOST=dma-chroma
       - CHROMA_PORT=8000
+      - SADTALKER_URL=http://sadtalker:7860
+      - SADTALKER_TIMEOUT=600
+      - TTS_ENABLED=true
+    volumes:
+      - ./backend/data/piper:/app/data/piper
     depends_on:
       - dma-chroma
+      - sadtalker
     deploy:
       resources:
         reservations:
@@ -123,11 +161,6 @@ services:
       - fcs-service
       - dma-service
     restart: unless-stopped
-
-volumes:
-  fsd-chroma-data:
-  fcs-chroma-data:
-  dma-chroma-data:
 
 # Note: For production with Kubernetes, use Ingress to route:
 # /api/fsd/* -> fsd-service
