@@ -23,3 +23,12 @@ DEVELOPMENT_PLAN.md
 # tools / cache
 .claude/
 notebooks/unsloth_compiled_cache/
+
+# Playwright artifacts
+frontend/test-results/
+frontend/playwright-report/
+test_output.mp4
+
+# JMeter results and logs
+tests/jmeter/*.jtl
+tests/jmeter/*.log
