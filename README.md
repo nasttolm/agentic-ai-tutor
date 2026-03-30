@@ -1,6 +1,3 @@
-<<<<<<< HEAD
-# agentic-ai-tutor
-=======
 # Scalable Agentic AI Tutor (SLMs + LoRA + RAG + MLOps)
 
 MSc dissertation project — London South Bank University
@@ -230,4 +227,3 @@ See `k8s/` for full manifests.
 **Anastasia Tolmacheva**
 Supervisor: Brahim El Boudani
 London South Bank University, 2026
->>>>>>> master
