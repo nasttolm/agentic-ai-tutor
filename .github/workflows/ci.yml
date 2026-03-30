@@ -49,15 +49,10 @@ jobs:
           npm audit --audit-level=high
 
       - name: Validate k8s manifests (dry-run)
-        uses: azure/k8s-lint@v2
-        with:
-          manifests: |
-            k8s/namespace.yaml
-            k8s/storage.yaml
-            k8s/fsd/deployment.yaml
-            k8s/fcs/deployment.yaml
-            k8s/dma/deployment.yaml
-            k8s/ingress.yaml
+        run: |
+          curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+          chmod +x kubectl && sudo mv kubectl /usr/local/bin/
+          kubectl apply --dry-run=client -f k8s/namespace.yaml -f k8s/storage.yaml -f k8s/fsd/deployment.yaml -f k8s/fcs/deployment.yaml -f k8s/dma/deployment.yaml -f k8s/ingress.yaml
 
   build:
     name: Build and push image
