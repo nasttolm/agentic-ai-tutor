@@ -4,12 +4,16 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
+    "predev": "node scripts/copy-headtts.mjs",
+    "build": "next build --webpack",
+    "prebuild": "node scripts/copy-headtts.mjs",
+"start": "next start",
     "lint": "eslint"
   },
   "dependencies": {
     "@heroicons/react": "^2.2.0",
+    "@met4citizen/headtts": "^1.0.0",
+    "@met4citizen/talkinghead": "^1.0.0",
     "axios": "^1.13.4",
     "next": "16.1.6",
     "react": "19.2.3",
@@ -23,7 +27,7 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.1.6",
-    "tailwindcss": "^4",
+"tailwindcss": "^4",
     "typescript": "^5"
   }
 }
