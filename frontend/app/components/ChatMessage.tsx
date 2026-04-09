@@ -13,6 +13,8 @@ interface ChatMessageProps {
 }
 
 export function ChatMessage({ message, isPlaying, isLoadingAudio, onPlayAudio }: ChatMessageProps) {
+  const [sourcesOpen, setSourcesOpen] = useState(false);
+
   if (message.role === 'user') {
     return (
       <div className="flex justify-end">
@@ -24,7 +26,6 @@ export function ChatMessage({ message, isPlaying, isLoadingAudio, onPlayAudio }:
   }
 
   const sources = message.sources?.filter(s => s.file) || [];
-  const [sourcesOpen, setSourcesOpen] = useState(false);
 
   return (
     <div className="flex gap-4">
@@ -33,17 +34,14 @@ export function ChatMessage({ message, isPlaying, isLoadingAudio, onPlayAudio }:
         {onPlayAudio && (
           <button
             onClick={onPlayAudio}
-            disabled={isLoadingAudio}
-            title={isPlaying ? 'Stop' : 'Listen'}
-            className={`p-1.5 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
-              isPlaying
+            title={isPlaying || isLoadingAudio ? 'Stop' : 'Listen'}
+            className={`p-1.5 rounded-lg transition-colors ${
+              isPlaying || isLoadingAudio
                 ? 'text-violet-600 hover:bg-violet-100'
                 : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'
             }`}
           >
-            {isLoadingAudio ? (
-              <span className="block w-4 h-4 border border-gray-300 border-t-violet-500 rounded-full animate-spin" />
-            ) : isPlaying ? (
+            {isPlaying || isLoadingAudio ? (
               <StopIcon className="w-4 h-4" />
             ) : (
               <SpeakerWaveIcon className="w-4 h-4" />

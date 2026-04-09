@@ -3,6 +3,13 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { api, Message, Subject } from '@/lib/api';
 import { ChatMessage, LoadingMessage, SubjectTabs, ChatInput } from './components';
+import dynamic from 'next/dynamic';
+import type { TalkingHeadAvatarHandle } from './components/TalkingHeadAvatar';
+
+const TalkingHeadAvatar = dynamic(
+  () => import('./components/TalkingHeadAvatar').then(m => m.TalkingHeadAvatar),
+  { ssr: false }
+);
 
 interface TabState {
   messages: Message[];
@@ -16,21 +23,21 @@ export default function Home() {
   const [tabStates, setTabStates] = useState<Record<string, TabState>>({});
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // TTS state
-  const [ttsEnabled, setTtsEnabled] = useState(false);
-  const [playingIndex, setPlayingIndex] = useState<number | null>(null);
+  const [audioAutoPlayEnabled, setAudioAutoPlayEnabled] = useState(false);
+  const [avatarVisible, setAvatarVisible] = useState(false);
+  const [speakingIndex, setSpeakingIndex] = useState<number | null>(null);
   const [loadingAudioIndex, setLoadingAudioIndex] = useState<number | null>(null);
-  const currentAudioRef = useRef<HTMLAudioElement | null>(null);
+  const loadingAudioIndexRef = useRef<number | null>(null);
+  const speakingIndexRef = useRef<number | null>(null);
+  const avatarRef = useRef<TalkingHeadAvatarHandle>(null);
 
-  // Avatar state
-  const [avatarEnabled, setAvatarEnabled] = useState(false);
-  const [avatarVideoUrl, setAvatarVideoUrl] = useState<string | null>(null);
-  const [avatarLoading, setAvatarLoading] = useState(false);
-
-  // Load preferences from localStorage (client-side only)
   useEffect(() => {
-    setTtsEnabled(localStorage.getItem('ttsEnabled') === 'true');
-    setAvatarEnabled(localStorage.getItem('avatarEnabled') === 'true');
+    speakingIndexRef.current = speakingIndex;
+  }, [speakingIndex]);
+
+  useEffect(() => {
+    setAudioAutoPlayEnabled(localStorage.getItem('ttsEnabled') === 'true');
+    setAvatarVisible(localStorage.getItem('avatarEnabled') === 'true');
   }, []);
 
   useEffect(() => {
@@ -53,85 +60,76 @@ export default function Home() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [currentState.messages, currentState.loading]);
 
-  const stopCurrentAudio = useCallback(() => {
-    if (currentAudioRef.current) {
-      currentAudioRef.current.pause();
-      currentAudioRef.current = null;
+  const stopSpeaking = useCallback(() => {
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
     }
-    setPlayingIndex(null);
+    avatarRef.current?.stop();
+    setSpeakingIndex(null);
     setLoadingAudioIndex(null);
+    loadingAudioIndexRef.current = null;
   }, []);
 
-  const clearAvatarVideo = useCallback(() => {
-    setAvatarVideoUrl(prev => {
-      if (prev) URL.revokeObjectURL(prev);
-      return null;
-    });
-    setAvatarLoading(false);
+  const speakWithSystemTts = useCallback((text: string, index: number) => {
+    if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.onstart = () => {
+      setSpeakingIndex(index);
+      setLoadingAudioIndex(null);
+      loadingAudioIndexRef.current = null;
+    };
+    utterance.onend = () => {
+      if (speakingIndexRef.current === index) {
+        setSpeakingIndex(null);
+      }
+    };
+    utterance.onerror = () => {
+      if (speakingIndexRef.current === index) {
+        setSpeakingIndex(null);
+      }
+    };
+    window.speechSynthesis.speak(utterance);
   }, []);
 
-  const playAudio = useCallback(async (text: string, subject: string, index: number) => {
-    if (playingIndex === index) {
-      stopCurrentAudio();
-      clearAvatarVideo();
+  const startSpeaking = useCallback((text: string, index: number) => {
+    setLoadingAudioIndex(index);
+    loadingAudioIndexRef.current = index;
+
+    // Use TalkingHead/HeadTTS as the primary audio engine regardless of avatar visibility.
+    // Avatar visibility controls only rendering, not playback.
+    const started = avatarRef.current?.speak(text);
+    if (started) {
       return;
     }
-    stopCurrentAudio();
-    clearAvatarVideo();
 
-    if (avatarEnabled) {
-      // Avatar mode: generate video (MP4 contains audio)
-      setAvatarLoading(true);
-      setPlayingIndex(index);
-      try {
-        const blob = await api.video(text, subject);
-        const url = URL.createObjectURL(blob);
-        setAvatarVideoUrl(url);
-      } catch {
-        setPlayingIndex(null);
-      } finally {
-        setAvatarLoading(false);
-      }
-    } else {
-      // Normal TTS mode
-      setLoadingAudioIndex(index);
-      try {
-        const blob = await api.tts(text, subject);
-        const url = URL.createObjectURL(blob);
-        const audio = new Audio(url);
-        currentAudioRef.current = audio;
-        setLoadingAudioIndex(null);
-        setPlayingIndex(index);
-        audio.onended = () => {
-          setPlayingIndex(null);
-          URL.revokeObjectURL(url);
-          currentAudioRef.current = null;
-        };
-        audio.play();
-      } catch {
-        setLoadingAudioIndex(null);
-        setPlayingIndex(null);
-      }
+    // Fallback is kept for rare cases where TalkingHead is not ready yet.
+    speakWithSystemTts(text, index);
+  }, [speakWithSystemTts]);
+
+  const toggleMessageAudio = useCallback((text: string, index: number) => {
+    if (speakingIndex === index || loadingAudioIndex === index) {
+      stopSpeaking();
+      return;
     }
-  }, [playingIndex, stopCurrentAudio, clearAvatarVideo, avatarEnabled]);
+    stopSpeaking();
+    startSpeaking(text, index);
+  }, [speakingIndex, loadingAudioIndex, stopSpeaking, startSpeaking]);
 
   const toggleTts = () => {
-    const next = !ttsEnabled;
-    setTtsEnabled(next);
+    const next = !audioAutoPlayEnabled;
+    setAudioAutoPlayEnabled(next);
     localStorage.setItem('ttsEnabled', String(next));
-    if (!next) stopCurrentAudio();
+    if (!next) stopSpeaking();
   };
 
   const toggleAvatar = () => {
-    const next = !avatarEnabled;
-    setAvatarEnabled(next);
+    const next = !avatarVisible;
+    setAvatarVisible(next);
     localStorage.setItem('avatarEnabled', String(next));
-    if (!next) clearAvatarVideo();
   };
 
   const handleTabChange = (tabId: string) => {
-    stopCurrentAudio();
-    clearAvatarVideo();
+    stopSpeaking();
     setActiveTab(tabId);
   };
 
@@ -167,8 +165,10 @@ export default function Home() {
       const updatedMessages = [...newMessages, assistantMessage];
       updateTabState(activeTab, { messages: updatedMessages, loading: false });
 
-      if (ttsEnabled) {
-        playAudio(response.answer, activeTab, newMessages.length);
+      if (audioAutoPlayEnabled) {
+        const idx = newMessages.length;
+        stopSpeaking();
+        startSpeaking(response.answer, idx);
       }
     } catch (error) {
       console.error('Chat error:', error);
@@ -183,7 +183,6 @@ export default function Home() {
     <div className="flex flex-col h-screen bg-white">
       <SubjectTabs subjects={subjects} activeTab={activeTab} onTabChange={handleTabChange} />
 
-      {/* Chat Messages */}
       <div className="flex-1 overflow-y-auto">
         <div className={`max-w-3xl mx-auto px-6 ${currentState.messages.length === 0 ? 'h-full flex flex-col' : 'py-4'}`}>
           {currentState.messages.length === 0 ? (
@@ -198,11 +197,11 @@ export default function Home() {
                 <ChatMessage
                   key={index}
                   message={message}
-                  isPlaying={playingIndex === index && !avatarLoading}
-                  isLoadingAudio={loadingAudioIndex === index || (avatarEnabled && avatarLoading && playingIndex === index)}
+                  isPlaying={speakingIndex === index}
+                  isLoadingAudio={loadingAudioIndex === index}
                   onPlayAudio={
                     message.role === 'assistant'
-                      ? () => playAudio(message.content, activeTab, index)
+                      ? () => toggleMessageAudio(message.content, index)
                       : undefined
                   }
                 />
@@ -214,48 +213,28 @@ export default function Home() {
         </div>
       </div>
 
-      {/* Avatar Panel — shown above input when avatar mode is ON */}
-      {avatarEnabled && (
-        <div className="border-t border-gray-100 py-4 flex justify-center bg-white">
-          <div className="w-44 h-44 rounded-2xl overflow-hidden bg-gray-50 border border-gray-200 relative">
-            <img
-              src={api.avatarUrl(activeTab)}
-              alt="Avatar"
-              className="w-full h-full object-cover"
-              onError={(e) => {
-                (e.target as HTMLImageElement).style.display = 'none';
-              }}
-            />
-            {avatarVideoUrl && (
-              <video
-                src={avatarVideoUrl}
-                autoPlay
-                className="absolute inset-0 w-full h-full object-cover"
-                onEnded={() => {
-                  clearAvatarVideo();
-                  setPlayingIndex(null);
-                }}
-              />
-            )}
-            {avatarLoading && (
-              <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/30">
-                <span className="w-8 h-8 border-2 border-white/40 border-t-white rounded-full animate-spin" />
-                <span className="text-xs text-white/80 mt-2">Generating...</span>
-              </div>
-            )}
-          </div>
+      <div className={avatarVisible ? 'border-t border-gray-100 py-4 flex justify-center bg-white' : 'hidden'}>
+        <div className="w-80 h-80 rounded-2xl overflow-hidden bg-gray-50 border border-gray-200 relative -top-2">
+          <TalkingHeadAvatar
+            ref={avatarRef}
+            onSpeakStart={() => {
+              setSpeakingIndex(loadingAudioIndexRef.current);
+              setLoadingAudioIndex(null);
+              loadingAudioIndexRef.current = null;
+            }}
+            onSpeakEnd={() => setSpeakingIndex(null)}
+          />
         </div>
-      )}
+      </div>
 
-      {/* Input */}
       <ChatInput
         value={currentState.input}
         onChange={(value) => updateTabState(activeTab, { input: value })}
         onSend={handleSend}
         disabled={currentState.loading}
-        ttsEnabled={ttsEnabled}
+        ttsEnabled={audioAutoPlayEnabled}
         onToggleTts={toggleTts}
-        avatarEnabled={avatarEnabled}
+        avatarEnabled={avatarVisible}
         onToggleAvatar={toggleAvatar}
       />
     </div>
