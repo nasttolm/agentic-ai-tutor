@@ -222,6 +222,67 @@ See `k8s/` for full manifests.
 
 ---
 
+## Argo CD (GitOps Deployment)
+
+This repository includes Argo CD manifests:
+- `k8s/argo/project.yaml`
+- `k8s/argo/application.yaml`
+
+`Application` tracks `path: k8s` on `targetRevision: main` and syncs it to namespace `ai-tutor`.
+
+### Local (Docker Desktop Kubernetes)
+
+1. Install Argo CD:
+```bash
+kubectl create namespace argocd
+kubectl apply --server-side -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+```
+
+2. Register project and app:
+```bash
+kubectl apply -f k8s/argo/project.yaml
+kubectl apply -f k8s/argo/application.yaml
+```
+
+3. Open Argo CD UI:
+```bash
+kubectl -n argocd port-forward svc/argocd-server 8080:443
+```
+Open: `https://localhost:8080`
+
+4. Get initial admin password:
+```bash
+kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d
+```
+Username: `admin`
+
+Note for local Docker Desktop:
+- `Ingress` may remain `Progressing` because AWS ALB annotations in `k8s/ingress.yaml` are cloud-specific.
+- Core services and pods can still be healthy and running.
+
+### Cloud (EKS) recommended flow
+
+1. Create EKS cluster and install:
+- Argo CD
+- AWS Load Balancer Controller (for ALB Ingress)
+- NVIDIA device plugin (if GPU nodes are used)
+
+2. Ensure manifests use cloud-appropriate settings:
+- Ingress annotations for ALB
+- StorageClass values available in EKS (for example `gp3`)
+
+3. Apply Argo resources:
+```bash
+kubectl apply -f k8s/argo/project.yaml
+kubectl apply -f k8s/argo/application.yaml
+```
+
+4. GitOps runtime behavior:
+- Push to `main` updates manifests/images in Git.
+- Argo CD detects commit and syncs cluster state automatically (`prune` + `selfHeal` enabled).
+
+---
+
 ## Author
 
 **Anastasia Tolmacheva**

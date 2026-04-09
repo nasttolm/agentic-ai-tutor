@@ -652,6 +652,25 @@ As shown in Figure \ref{fig:deployment}, the system consists of four main layers
 
 This separation improves fault isolation, since a failure in one subject-specific service does not directly interrupt the others. Each service can be restarted, updated, and scaled independently. In Kubernetes, each service is managed by its own Deployment, which maintains multiple underlying pod instances, automatically restarts failed replicas, and supports scaling up or down in response to demand. In addition, retrieval storage is externalised into a dedicated ChromaDB instance for each subject. For that reason the application layer remains stateless at runtime, which simplifies dynamic scaling. Because each subject has its own Deployment, database, and embedded LoRA adapter, the services can be scaled independently according to subject-specific traffic and resource requirements.
 
+Figure \ref{fig:kubernetes-cli} shows the deployed Kubernetes resources in the ai-tutor namespace. The output includes pods, services, and deployments for the frontend, subject-specific backend services, and ChromaDB instances, all in a running state.
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=\linewidth]{figs/kubernetes_cli.png}
+    \caption{Kubernetes resources showing running pods, services, and deployments for the ai-tutor application.}
+    \label{fig:kubernetes-cli}
+\end{figure}
+\FloatBarrier
+
+Figure \ref{fig:kubernetes-ui} shows the Kubernetes resources as visualised in Docker Desktop. All deployments are in an available state, and all pods are running successfully. The system consists of subject-specific backend services, corresponding ChromaDB instances, and a frontend application, each deployed as separate components within the ai-tutor namespace.
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=\linewidth]{figs/kubernetes_ui.png}
+    \caption{Kubernetes dashboard in Docker Desktop showing deployments, pods, services, and cluster status for the ai-tutor application.}
+    \label{fig:kubernetes-ui}
+\end{figure}
+\FloatBarrier
+
 \subsection{Backend service}
 
 Each backend microservice is a FastAPI application that combines a LoRA-adapted language model with a retrieval-augmented generation (RAG) pipeline. The same Docker image is used for all three subjects. The subject configuration file subjects.yaml and the subject-specific LoRA adapters are baked into the backend image during the Docker build. At runtime, the SUBJECT environment variable selects which subject configuration and embedded LoRA adapter to activate, and determines which external ChromaDB instance inside the Kubernetes cluster the service connects to.
@@ -695,48 +714,53 @@ The service also provides a streaming endpoint (/api/chat/stream) that yields to
 
 The frontend is a Next.js application (version 16) that provides a chat-based interface for interacting with the tutor. It is built as a standalone production bundle, which produces a self-contained server.js file suitable for containerised deployment.
 
-\paragraph{Dual-mode routing.}
-The frontend supports two routing configurations, controlled entirely by build-time environment variables:
-
-\begin{itemize}
-    \item \textbf{Monolithic mode.} A single NEXT\_PUBLIC\_API\_URL variable points to one backend that serves all subjects. This mode is used with docker-compose.yml during local development.
-    \item \textbf{Microservices mode.} Separate variables (NEXT\_PUBLIC\_FSD\_API\_URL, NEXT\_PUBLIC\_FCS\_API\_URL, NEXT\_PUBLIC\_DMA\_API\_URL) point to individual backend services. In Kubernetes, these URLs resolve via the Ingress controller (using per-subject path prefixes) or via internal service DNS names depending on the deployment configuration.
-\end{itemize}
+\paragraph{Mode routing.}
+The frontend supports microservices mode. Separate variables (NEXT\_PUBLIC\_FSD\_API\_URL, NEXT\_PUBLIC\_FCS\_API\_URL, NEXT\_PUBLIC\_DMA\_API\_URL) point to individual backend services. In Kubernetes, these URLs resolve via the Ingress controller (using per-subject path prefixes) or via internal service DNS names depending on the deployment configuration.
 
 \paragraph{User interface.}
 The interface is built with React 19 and Tailwind CSS. It provides subject selection tabs, a conversational chat panel, and source cards that display retrieved chunks with their similarity scores. The frontend uses Axios for API communication and supports both synchronous and streaming response modes.
 
-% \subsection{Talking-head avatar}
+Figure \ref{fig:frontend-main} shows the main chat interface, including subject selection and a generated tutor response.
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=\linewidth]{figs/frontend_ui_main.png}
+    \caption{Main frontend interface showing subject selection and tutor response.}
+    \label{fig:frontend-main}
+\end{figure}
+\FloatBarrier
 
-% To provide a more engaging and accessible interaction mode, the system includes an optional talking-head avatar feature. When enabled, the tutor's text responses are rendered as short lip-synced videos: the response text is first converted to speech, and the resulting audio is used to animate a static avatar photograph. This produces a video in which the avatar appears to speak the response, offering a richer multimodal output compared to text alone.
+The system also provides transparency through retrieval-augmented generation. The interface allows users to inspect supporting materials used during answer generation (see figure \ref{fig:frontend-main}).
 
-% \paragraph{Pipeline.}
-% The avatar pipeline consists of two sequential stages:
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=\linewidth]{figs/frontend_ui_sources.png}
+    \caption{Retrieved source panel showing top-matching chunks and similarity scores used to support the generated answer.}
+    \label{fig:frontend-sources}
+\end{figure}
+\FloatBarrier
 
-% \begin{enumerate}
-%     \item \textbf{Speech synthesis.} The response text is passed to Piper TTS, a lightweight neural text-to-speech engine that runs locally within the backend container. Piper synthesises a WAV audio file using the \texttt{en\_US-lessac-medium} voice model.
-%     \item \textbf{Talking-head rendering.} The synthesised audio is forwarded to a dedicated SadTalker service. SadTalker is a generative model that takes a static face image and a WAV file as inputs and produces a lip-synced MP4 video. The video is returned to the frontend and played in the avatar panel.
-% \end{enumerate}
+\subsection{Talking-head avatar}
 
-% The combined pipeline is exposed via the \texttt{POST /api/video} endpoint on the backend, which sequences the two stages and returns the final \texttt{video/mp4} binary.
+To provide a more engaging and accessible interaction mode, the system includes a talking-head avatar feature. The system renders a 3D avatar in the browser and animates it in real time. The response text is converted to speech, and the corresponding phoneme and viseme data are used to synchronise the avatar’s lip movements. This produces a responsive, interactive multimodal output that combines audio and animation.
 
-% \paragraph{SadTalker service.}
-% SadTalker is deployed as a separate Docker container running a FastAPI application on port 7860. It exposes two endpoints: \texttt{POST /generate}, which accepts a WAV file and returns an MP4 video, and \texttt{GET /avatar}, which serves the static avatar photograph.
+\paragraph{Pipeline.}
+The avatar pipeline consists of two tightly integrated stages:
 
-% To minimise per-request latency, all SadTalker models (\texttt{CropAndExtract}, \texttt{Audio2Coeff}, \texttt{AnimateFromCoeff}) are loaded into GPU memory once at application startup using FastAPI's lifespan context. The static avatar image is also pre-processed once at startup: facial landmarks are extracted and 3DMM coefficients are computed and cached. At inference time only the audio-to-coefficient and face rendering stages need to run, reducing per-request processing time significantly compared to a subprocess-per-request approach.
+\begin{enumerate}
+    \item \textbf{Speech synthesis.} The response text is processed using HeadTTS, a browser-based text-to-speech engine. In addition to audio output, HeadTTS provides phoneme-level timing and viseme data required for animation.
+    \item \textbf{Avatar rendering and animation.} The audio and viseme stream are passed to the TalkingHead renderer, which animates a 3D avatar directly in the browser. Lip movements are driven in real time using the viseme data, allowing the avatar to synchronise with speech without generating intermediate video files.
+\end{enumerate}
 
-% Inference is serialised with a threading lock to prevent concurrent GPU access, since SadTalker does not support parallel inference within a single process.
+The pipeline operates entirely on the client side, eliminating the need for backend video generation endpoints. This reduces system complexity and enables low-latency interaction.
 
-% \paragraph{GPU memory considerations.}
-% Each 4-bit quantised Phi-4-mini backend instance occupies approximately 3--4\,GB of GPU VRAM. SadTalker requires an additional 2\,GB. On the development GPU (NVIDIA RTX 4070 Ti, 12\,GB VRAM), this limits the number of simultaneously active backend services to two when SadTalker is also loaded on GPU. In practice all three subject backends are deployed, with SadTalker configured to run on CPU as a fallback when GPU memory is fully occupied by the language model instances. Face rendering is performed at the default resolution of 256$\times$256 pixels, matching the available SadTalker checkpoint (\texttt{SadTalker\_V0.0.2\_256.safetensors}). A 128$\times$128 checkpoint also exists and would reduce rendering time further, but was not required given the performance achieved with the 256 model.
+\paragraph{TalkingHead integration.}
+TalkingHead is integrated as a client-side rendering component within the frontend application. It loads a predefined 3D avatar model and applies animation updates based on incoming viseme data.
 
-% \paragraph{Frontend integration.}
-% The avatar panel is displayed above the chat input area and is toggled by the user via a dedicated button. When the panel is enabled and idle, the static avatar photograph is shown, fetched from the \texttt{GET /api/avatar} proxy endpoint on the backend. When a response is generated and TTS playback is triggered, a loading spinner is overlaid on the static image while the video is being generated. Once the MP4 is received, it is played in place of the static image using an HTML \texttt{<video>} element; when playback ends, the static image is restored without a network round-trip, since the image element remains mounted in the DOM throughout.
+Unlike video-based approaches, no pre-processing of images or generation of intermediate assets is required. The avatar remains persistent in the interface and updates dynamically as speech is produced. This allows continuous interaction rather than discrete video playback.
 
+Because both speech synthesis and animation are executed in the browser, the system avoids GPU-bound backend services and simplifies deployment. However, this approach depends on client-side performance and browser capabilities.
 
 \subsection{Containerisation}
-
-Both the backend and frontend are packaged as Docker images, and two Docker Compose configurations provide local deployment modes.
 
 \paragraph{Backend Dockerfile.}
 The backend image is based on pytorch/pytorch:2.2.0-cuda12.1-cudnn8-runtime, which includes the CUDA runtime needed for 4-bit quantisation via bitsandbytes. The image installs Python dependencies from requirements.txt, copies the application source code, subjects.yaml, and the subject-specific LoRA adapters, and runs Uvicorn on port 8000. The LoRA adapters are therefore baked into the image, whereas retrieval storage is externalised to dedicated ChromaDB instances running separately inside the Kubernetes cluster.
@@ -752,17 +776,20 @@ The frontend uses a multi-stage build to minimise the final image size:
 
 The final image exposes port 3000 and starts the Node.js server directly.
 
-\paragraph{Docker Compose modes.}
-Two Compose files provide alternative local deployment configurations.
+\paragraph{Docker Compose mode.}
 
-As shown in the two Docker Compose configurations (docker-compose.yml and docker-compose.microservices.yml):
+{Microservices mode} (docker-compose.microservices.yml) runs three backend containers (FSD on port 8001, FCS on port 8002, DMA on port 8003), each configured with a SUBJECT environment variable and a dedicated GPU. The frontend is built with per-subject API URLs. This mode requires three GPUs and provides fault isolation between subjects.
 
-\begin{itemize}
-    \item \textbf{Monolithic mode} (docker-compose.yml) runs one backend container that loads all three subjects, plus one frontend container. The frontend is built with a single NEXT\_PUBLIC\_API\_URL pointing to http://localhost:8000. This mode requires only one GPU and is suitable for development and testing.
-    \item \textbf{Microservices mode} (docker-compose.microservices.yml) runs three backend containers (FSD on port 8001, FCS on port 8002, DMA on port 8003), each configured with a SUBJECT environment variable and a dedicated GPU. The frontend is built with per-subject API URLs. This mode requires three GPUs and provides fault isolation between subjects.
-\end{itemize}
+Microservices mode configure health checks that poll the /health endpoint every 30 seconds. Data volumes are not mounted to the backend containers. Instead, each backend service connects to its dedicated ChromaDB container via HTTP using the CHROMA\_HOST and CHROMA\_PORT environment variables, and ChromaDB persistence is managed through named Docker volumes.
 
-Both modes configure health checks that poll the /health endpoint every 30 seconds. In monolithic mode, the single backend container mounts the data directory (defaulting to ./backend/data) as a volume. In microservices mode, data volumes are not mounted to the backend containers. Instead, each backend service connects to its dedicated ChromaDB container via HTTP using the CHROMA\_HOST and CHROMA\_PORT environment variables, and ChromaDB persistence is managed through named Docker volumes.
+Figure \ref{fig:docker-containers} shows the local microservices deployment, where separate containers are used for the frontend, subject-specific backend services, and dedicated ChromaDB instances.
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=\linewidth]{figs/docker_containers.png}
+    \caption{Local microservices deployment showing frontend, subject-specific backend services, and ChromaDB containers.}
+    \label{fig:docker-containers}
+\end{figure}
+\FloatBarrier
 
 \subsection{Kubernetes orchestration}
 
@@ -819,38 +846,60 @@ After every generation call, the inference module logs the subject identifier, t
 \paragraph{RAG retrieval logging.}
 Each retrieval call logs the subject, the number of chunks returned, and a short prefix of the query at INFO level. At DEBUG level, the similarity score and a brief text preview are logged for the top three retrieved chunks. Connection failures and missing ChromaDB collections are reported at WARNING and ERROR levels respectively, which supports quick diagnosis of retrieval problems.
 
+
 \section{Lifecycle management}
 
 \subsection{CI/CD pipeline}
 
-A continuous integration and delivery pipeline was built using GitHub Actions and Argo CD. The pipeline runs on every push to the main branch and consists of two sequential jobs.
+A continuous integration and delivery pipeline was implemented using GitHub Actions and Argo CD. The GitHub Actions workflow is organised into four jobs: lint, build, playwright, and scan. The build job depends on lint, while the Trivy-based scan job depends on the successful completion of the image build. The playwright job runs separately as part of the same workflow to validate frontend behaviour through smoke tests.
 
-The lint job runs on a standard Ubuntu runner without a GPU. It first checks the Python syntax of all backend modules using py\_compile, covering both the main service (config.py, rag.py, inference.py, main.py, schemas.py, logging\_config.py, tts.py, sadtalker.py) and the SadTalker service (app.py). It then validates the Kubernetes manifests for structural correctness using a dry-run lint step. This job runs on every push and every pull request, giving fast feedback before a Docker image is built.
+Figure \ref{fig:github-actions} illustrates the GitHub Actions workflow used in the project. The pipeline consists of multiple stages, including syntax validation, container image build and push, frontend testing, and vulnerability scanning, with dependencies between jobs explicitly defined.
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=\linewidth]{figs/github_actions.png}
+    \caption{GitHub Actions workflow showing CI/CD pipeline with syntax checking, container image build and push, frontend testing, and vulnerability scanning stages.}
+    \label{fig:github-actions}
+\end{figure}
+\FloatBarrier
+
+The lint job runs on a standard Ubuntu runner without a GPU. It first checks the Python syntax of all backend modules using py\_compile, covering both the main service (config.py, rag.py, inference.py, main.py, schemas.py, logging\_config.py, tts.py). It then validates the Kubernetes manifests for structural correctness using kubeconform. This job runs on every push and every pull request, providing fast feedback before a Docker image is built.
 
 \paragraph{Security scanning.}
-The lint job also runs two automatic security checks. Bandit, a static analysis tool for Python, scans all backend source files for common security problems with medium severity or higher. Some warnings are expected and are not hidden. They are shown in the CI log so they remain visible, but they do not fail the build. This is because the current findings are accepted in this deployment setup: binding to all network interfaces is necessary for Docker, using /tmp is safe inside isolated containers, and HuggingFace model versions are controlled through subjects.yaml instead of revision pinning. For the frontend, npm audit is run at the high severity level. The build fails only if high or critical vulnerabilities are found in the dependency tree. Moderate issues in development-only dependencies, such as ESLint plugins or TypeScript tools, are accepted and do not fail the build.
+The lint job also includes two automated security checks. First, Bandit, a static analysis tool for Python, scans the backend source code for common security issues. Second, the frontend dependencies are checked with npm audit at high severity level, so the audit focuses on high and critical vulnerabilities in the dependency tree.
 
-The build job runs only on pushes to main and only if the lint job passes. It checks out the repository including Git LFS objects (the LoRA adapter .safetensors files), authenticates to the GitHub Container Registry (ghcr.io), and builds and pushes the backend Docker image. Two tags are produced: a latest tag for the default branch and a commit-SHA tag (for example, ghcr.io/nasttolm/ai-tutor-backend:a3f1c2d) that uniquely identifies each build. Build-layer caching via GitHub Actions cache is enabled to reduce image build time on repeated pushes.
+The build job runs only on pushes to the main branch and only if the lint job succeeds. It checks out the repository including Git LFS objects (the LoRA adapter .safetensors files), authenticates to the GitHub Container Registry (ghcr.io), and builds and pushes the backend Docker image. Two tags are produced: a latest tag for the default branch and a commit-SHA tag (for example, ghcr.io/nasttolm/ai-tutor-backend:a3f1c2d) that uniquely identifies each build. Build-layer caching through the GitHub Actions cache is enabled to reduce image build time on repeated pushes.
 
 \paragraph{Container image scanning.}
-A third job, scan, runs after the build job and checks the published Docker image for vulnerabilities using Trivy \parencite{trivy}. While Bandit analyses the source code, Trivy examines the built container image itself. It can detect known CVEs in operating system packages, system libraries, and Python dependencies inside the image. The scan focuses on HIGH and CRITICAL severity issues. The results are exported in SARIF format and uploaded to the GitHub Security tab through the CodeQL upload action. This makes the vulnerabilities visible in the repository’s security dashboard, but it does not stop the pipeline because the scan uses exit-code: 0.This separation is useful because it covers different types of risk. Source-level problems can be found early in the lint job, while supply-chain and operating system vulnerabilities coming from the base image or installed packages are reported after the image has been built.
+The scan job runs after the build job and checks the published Docker image for vulnerabilities using Trivy \parencite{trivy}. While Bandit analyses the source code, Trivy examines the built container image itself, including operating system packages, system libraries, and installed Python dependencies. The scan focuses on HIGH and CRITICAL severity issues. The results are exported in SARIF format and uploaded to the GitHub Security tab through the CodeQL upload action. This makes the vulnerabilities visible in the repository’s security dashboard, but it does not stop the pipeline because the scan uses exit-code: 0. This separation is useful because it covers different layers of risk: source-level problems can be identified early in the lint job, while supply-chain and base-image vulnerabilities are reported after the image has been built.
 
 \subsection{GitOps deployment with Argo CD}
 
 Deployment to Kubernetes is managed with Argo CD following the GitOps approach. Two manifests are provided in k8s/argo/: an AppProject that restricts deployments to the ai-tutor namespace from the project repository, and an Application that declares the desired cluster state.
 
-The Application manifest points Argo CD at the k8s/ directory of the repository and instructs it to render the manifests using Kustomize. Two synchronisation policies are enabled: prune, which removes cluster resources that have been deleted from the repository, and selfHeal, which reverts any manual changes made directly to the cluster. Together, these policies make the git repository the single source of truth for the cluster state.
+The Application manifest points Argo CD at the k8s/ directory of the repository and instructs it to render the manifests using Kustomize. Two synchronisation policies are enabled: prune, which removes cluster resources that have been deleted from the repository, and selfHeal, which reverts any manual changes made directly to the cluster. Together, these policies make the Git repository the single source of truth for the cluster state.
 
-The end-to-end delivery flow works as follows: 
+The end-to-end delivery flow works as follows:
 \begin{itemize}
     \item A developer pushes a commit to main; GitHub Actions builds and pushes a new image tagged with the commit SHA.
     \item The Kubernetes manifests in k8s/ are updated to reference the new tag.
     \item Argo CD detects the change during its next polling cycle and rolls out the updated Deployment to the cluster.
 \end{itemize}
 
+Figure \ref{fig:argo-cd} shows the Argo CD dashboard for the deployed application. The interface visualises the full set of Kubernetes resources, including services, pods, and ingress, as well as their current synchronisation and health status.
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=\linewidth]{figs/argo_cd.png}
+    \caption{Argo CD dashboard showing synchronised deployment state and resource topology of the ai-tutor application.}
+    \label{fig:argo-cd}
+\end{figure}
+\FloatBarrier
+
+In the local development environment, the Ingress resource may remain in a Progressing state despite successful application synchronisation. This behaviour is caused by the use of cloud-specific annotations (e.g. AWS ALB annotations) in combination with a local Kubernetes cluster (Docker Desktop), which does not provision an external load balancer. As a result, the status.loadBalancer field remains empty. This does not affect the internal functionality of the system, as services are still accessible via cluster networking and port-forwarding, and therefore does not indicate a deployment failure.
+
 \subsection{Automated testing}
 
-End-to-end smoke tests for the frontend are implemented with Playwright and run as part of the CI pipeline on every push. The test suite covers six scenarios that verify the core user-facing behaviour of the application without requiring a live backend: all API calls are intercepted at the browser level using Playwright's route mocking, so tests run entirely within GitHub Actions without GPU or network access to the model services.
+End-to-end smoke tests for the frontend are implemented with Playwright and run as part of the CI workflow on every push and pull request. The test suite covers six scenarios that verify the core user-facing behaviour of the application without requiring a live backend: all API calls are intercepted at the browser level using Playwright's route mocking, so tests run entirely within GitHub Actions without GPU or network access to the model services.
 
 The scenarios covered are:
 
@@ -863,38 +912,9 @@ The scenarios covered are:
     \item \textbf{Tab isolation.} Each subject tab maintains an independent message history: switching away and back preserves the conversation without cross-tab contamination.
 \end{enumerate}
 
-Playwright reports are uploaded as a GitHub Actions artefact on every run, retained for seven days, allowing failures to be inspected without re-running the pipeline.
+Playwright reports are uploaded as a GitHub Actions artefact on every run and retained for seven days, allowing failures to be inspected without re-running the pipeline.
 
 \subsection{Model versioning}
 
-Each LoRA adapter is assigned a semantic version, which is recorded in subjects.yaml alongside its name and ChromaDB identifier. The version field is exposed at runtime through the /health endpoint, which returns a versions dictionary mapping each loaded subject to its adapter version. This allows operators to check which adapter version is running in production without inspecting the image or the file system directly. When an adapter is retrained, the version field is incremented, providing a simple audit trail in the git history.
-
-% \section{Reflection on the Progress}
-
-% All six MLOps lifecycle stages described in this chapter have been fully implemented. The data pipeline, fine-tuning workflow, evaluation suite, deployment layer, operational logging, CI/CD pipeline, and model versioning strategy were all built and verified end-to-end.
-
-% \paragraph{Completed work.}
-% The data pipeline, fine-tuning workflow, and evaluation suite were implemented and applied consistently to all three subjects (FSD, FCS, DMA). Each subject has a fine-tuned LoRA adapter, a ChromaDB vector store populated with course materials, and a full set of evaluation results (BLEU, ROUGE-L, METEOR, BERTScore). The deployment layer is fully operational: the FastAPI backend, Next.js frontend, Docker Compose configurations, and Kubernetes manifests have all been implemented and verified.
-
-% \paragraph{Architecture refinement.}
-% During the implementation phase, the deployment architecture was refined to align with the design described in this chapter. Two changes were made to the containerisation and storage strategy. First, the subject-specific LoRA adapters are now copied into the backend image at build time (\texttt{COPY data/adapters/ ./adapters/}), making backend pods stateless at runtime and removing the dependency on a shared PersistentVolumeClaim. Second, ChromaDB is no longer accessed as a local PersistentClient reading from a mounted volume; instead, each subject has a dedicated ChromaDB Deployment inside the Kubernetes cluster, and the backend connects to it over HTTP using the \texttt{CHROMA\_HOST} and \texttt{CHROMA\_PORT} environment variables. These changes required updates to \texttt{backend/Dockerfile}, \texttt{backend/src/config.py}, \texttt{backend/src/rag.py}, all three subject Deployments, \texttt{docker-compose.microservices.yml}, and the storage and kustomization manifests.
-
-% \paragraph{Verification.}
-% The implemented system was verified at five progressive levels:
-
-% \begin{enumerate}
-%     \item \textbf{Static analysis.} Python syntax of all six backend modules (\texttt{config.py}, \texttt{rag.py}, \texttt{inference.py}, \texttt{main.py}, \texttt{schemas.py}, \texttt{logging\_config.py}) was verified with \texttt{python -m py\_compile}; all files compiled without errors. All Kubernetes manifests were validated with \texttt{kubectl apply -k k8s/ --dry-run=client}, which reported 19 resources created in dry-run mode: one namespace, three PersistentVolumeClaims, six Deployments (three backend, three ChromaDB), six Services (three backend, three ChromaDB), one frontend Deployment, one frontend Service, and one Ingress.
-
-%     \item \textbf{RAG pipeline verification.} The three ChromaDB vector stores were served locally as HTTP instances (one per subject, on ports 8001--8003) using \texttt{chroma run --path}. The Python \texttt{HttpClient} connected successfully to all three instances, confirming chunk counts of 60~(FSD), 73~(FCS), and 74~(DMA). End-to-end retrieval was verified by encoding a subject-appropriate query with the \texttt{all-MiniLM-L6-v2} sentence-transformer and querying each collection; all three returned topically relevant chunks with cosine similarity scores in the range 0.48--0.56, confirming that the embedding index is intact and the retrieval pipeline operates correctly without GPU resources.
-
-
-%     \item \textbf{Full backend verification (GPU).} The FastAPI backend was started in single-subject mode (\texttt{SUBJECT=fsd}) with the FSD ChromaDB instance running on port 8001. Model initialisation completed in approximately 9~seconds using 4-bit quantisation on an NVIDIA RTX~4070~Ti. The \texttt{/health} endpoint returned \texttt{\{"status":"ok","subjects\_loaded":["fsd"],"versions":\{"fsd":"1.0.0"\}\}}, confirming that model versioning is exposed correctly at runtime. The \texttt{/api/chat} endpoint was tested with the question \emph{``What is a variable?''}; the response returned a coherent multi-sentence tutor-style answer together with three ranked source chunks (similarity scores 0.48, 0.48, 0.39) from \texttt{FSD\_Topic\_14}, confirming that the LoRA adapter, the RAG retrieval pipeline, and the REST API are all functioning correctly together.
-
-%     \item \textbf{Docker Compose microservices verification (GPU).} The full microservices stack was started using \texttt{docker compose -f docker-compose.local.yml up}, which launched three ChromaDB containers (each with the corresponding subject's vector store mounted as a bind volume), three backend containers (one per subject, using the pre-built \texttt{ai-tutor-backend:test} image), and the frontend container. All three \texttt{/health} endpoints confirmed successful startup: each returned \texttt{\{"status":"ok","subjects\_loaded":["<subject>"],"versions":\{"<subject>":"1.0.0"\}\}}. The \texttt{/api/chat} endpoint on the FSD service was tested via the frontend with the question \emph{``What is a variable?''}; the response included a coherent tutor-style answer together with three ranked source chunks (similarity scores 0.47, 0.47, 0.37) from \texttt{FSD\_Topic\_14}, confirming end-to-end operation of the containerised microservices stack including RAG retrieval.
-
-%     \item \textbf{Kubernetes deployment verification.} The full set of Kubernetes manifests was deployed to a single-node Minikube cluster (v1.38.1) running inside WSL2 Ubuntu~24.04 on Windows~11. All 19 resources were created successfully: the \texttt{ai-tutor} namespace, three PersistentVolumeClaims (all Bound), three ChromaDB Deployments (all Running~1/1), seven ClusterIP Services, two frontend replicas (Running~1/1), and the Ingress resource. This confirms that the declarative Kubernetes configuration is correct and deployable. The backend pods initialise successfully and begin model loading; however, they do not reach the ready state in the local development environment because the NVIDIA GPU is not accessible to Kubernetes pods in this configuration. GPU passthrough to Kubernetes pods requires the NVML library to enumerate devices via the NVIDIA device plugin; in the WSL2-hosted Minikube environment, NVML returns \texttt{Not Supported} due to the paravirtualised GPU driver architecture used by Windows~WSL2, regardless of the container runtime configuration. GPU-accelerated inference was already confirmed at Levels~3 and~4. A production Kubernetes deployment on a cloud provider with bare-metal GPU nodes (e.g.\ AWS EKS with \texttt{p3} instances or GKE with GPU node pools) would not have this limitation, as the NVIDIA device plugin operates correctly on native Linux GPU hardware.
-% \end{enumerate}
-
-% \paragraph{Remaining work.}
-% The planned monitoring extensions (Prometheus metrics endpoint, Grafana dashboards, and Q\&A logging for drift detection) have not yet been implemented and remain as future work.
+Each LoRA adapter is assigned a semantic version, which is recorded in subjects.yaml alongside its name and ChromaDB identifier. The version field is exposed at runtime through the /health endpoint, which returns a versions dictionary mapping each loaded subject to its adapter version. This allows operators to check which adapter version is running in production without inspecting the image or the file system directly. When an adapter is retrained, the version field is incremented, providing a simple audit trail in the Git history.
 

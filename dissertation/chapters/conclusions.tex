@@ -1,0 +1,74 @@
+\chapter{Conclusions}
+\label{chap:conclusions}
+
+\section{Summary of Work Undertaken}
+
+This project set out to design, implement, and evaluate a scalable Agentic AI Tutor built from subject-specific Small Language Models, deployed using MLOps practices. The full development lifecycle was completed across six work packages, from data preparation through to deployment, CI/CD automation, and accessibility features.
+
+Three LoRA adapters were fine-tuned on Phi-4-mini-instruct using subject-specific question-answer datasets derived from institutional lecture materials for Fundamentals of Software Development (FSD), Fundamentals of Computer Science (FCS), and Discrete Mathematics (DMA). Each adapter was paired with a dedicated ChromaDB vector store populated with course slides and tutorials, forming a Retrieval-Augmented Generation pipeline that grounds model responses in verifiable course content.
+
+The complete system was containerised as a microservices architecture using Docker Compose and Kubernetes, with three independent backend services, three ChromaDB instances, and a Next.js frontend. A GitOps delivery pipeline was established using GitHub Actions and Argo CD, providing automated linting, security scanning, end-to-end testing, and image publishing on every push.
+
+Accessibility features were implemented through a multimodal output layer, including browser-based text-to-speech synthesis and a real-time talking-head avatar. The system uses HeadTTS for speech generation and TalkingHead for avatar animation, enabling low-latency, voice-based interaction for diverse learners without relying on backend media generation services.
+
+\section{Critical Evaluation of Requirements}
+
+The five objectives stated in the Introduction are evaluated in turn.
+
+\textbf{Objective 1: Design and train three SLMs.} All three LoRA adapters were successfully trained and evaluated. Fine-tuning consistently improved BLEU-2, ROUGE-L, and BERTScore compared to the base model across all subjects, confirming that subject-specific adaptation is effective. This objective is fully met.
+
+\textbf{Objective 2: Integrate a RAG pipeline.} RAG was implemented and evaluated, producing further gains in BLEU-2 across all three subjects and marginal ROUGE-L improvements in FSD and DMA. The drop in METEOR is interpreted as a consequence of domain-specific phrasing rather than degraded quality, a conclusion supported by the simultaneous BERTScore improvement. The pipeline also exposes retrieved source chunks to users, directly fulfilling the explainability requirement. This objective is fully met.
+
+\textbf{Objective 3: Containerise with Docker and manage with Kubernetes.} All services were containerised and a full set of Kubernetes manifests was produced and validated. The microservices architecture provides independent scaling and fault isolation per subject, as intended. One practical limitation was encountered: GPU passthrough to Kubernetes pods is not supported in the WSL2-hosted Minikube environment due to paravirtualised driver constraints, meaning model inference in the local Kubernetes cluster ran on CPU. This is a well-known platform limitation that does not affect production deployments on cloud providers with native GPU support. This objective is substantially met, with the GPU limitation documented as a deployment environment constraint rather than an architectural deficiency.
+
+\textbf{Objective 4: Apply MLOps principles.} Version control, automated testing, reproducible builds, and CI/CD pipelines were all implemented. Python syntax checking, Bandit security scanning, npm audit, Playwright end-to-end tests, and Trivy image scanning run automatically on every push. Argo CD provides GitOps deployment with automated sync and self-healing. Model adapter versions are tracked in subjects.yaml and exposed at runtime through the /health endpoint. Prometheus metrics and Grafana dashboards, as planned in WP5, were not implemented within the project timeline. This objective is mostly met, with real-time performance monitoring identified as the primary gap.
+
+\textbf{Objective 5: Evaluate accuracy, usability, and maintainability.} Quantitative evaluation was conducted using BLEU, ROUGE-L, METEOR, BERTScore, and latency across all three subjects and compared against two large LLM baselines. Usability was addressed through the interactive frontend and accessibility features. Maintainability is supported by the modular microservices structure, MLOps workflows, and adapter versioning. This objective is fully met.
+
+\section{Critical Evaluation of Project Goals}
+
+The central aim was to demonstrate that subject-specific SLMs fine-tuned with LoRA and augmented with RAG can deliver accurate, low-latency, and cost-effective tutoring responses as an alternative to large commercial models.
+
+The evaluation results support this claim. On BLEU-2 and BERTScore F1, the adapted SLMs outperform both LLM baselines (Llama-3.3-70B and Qwen3-32B) across all three subjects, demonstrating that domain adaptation closes the performance gap that would otherwise exist between a 3.8-billion-parameter model and models ten to twenty times larger. Inference latency for the SLMs (mean 4-5 seconds) is approximately half that of the Qwen3-32B baseline, supporting the claim that SLMs are suitable for low-latency online learning environments. The modular architecture allows each subject to be updated, retrained, or scaled without affecting the others, satisfying the requirement for independent subject modules.
+
+The main quantitative limitation is METEOR: the LLMs, particularly Llama-3.3-70B, score higher on this metric across all subjects. As discussed in the Analysis section, this is largely an artefact of how METEOR penalises fragmented word-level alignment. When a fine-tuned SLM produces a correct but differently phrased answer, METEOR may score it lower than a more generic base model that happens to partially echo the reference phrasing. The BERTScore results, which measure semantic rather than lexical similarity, do not exhibit this reversal, which is the more meaningful indicator for tutoring quality.
+
+Overall, the project demonstrates that a specialised SLM system can match or exceed the output quality of much larger general-purpose LLMs in a subject-specific domain, while operating at lower latency and without reliance on commercial API services.
+
+\section{Reflection on the Original Proposal}
+
+Several decisions taken during implementation diverged from the original plan in ways that improved the final system.
+
+The original monitoring plan (WP5) proposed Prometheus and Grafana dashboards. These were not implemented because the effort required to configure and integrate observability infrastructure within the remaining project timeline would have reduced time available for evaluation and writing. Structured logging to stdout, health check endpoints, and request-level inference logging were implemented as a practical alternative, providing sufficient observability for a single-developer deployment. Prometheus integration remains the most significant item of remaining work.
+
+
+\section{Future Work}
+
+Several directions are identified for future development.
+
+\textbf{Real-time monitoring.} The most important unimplemented component is a Prometheus metrics endpoint and Grafana dashboard. Adding these would enable detection of model drift, retrieval quality degradation, and latency anomalies in production, completing the WP5 objectives.
+
+\textbf{Continuous retraining pipeline.} Currently, retraining a LoRA adapter requires manual execution of the Colab notebook. Automating this as a triggered Argo Workflow when course materials are updated would complete the lifecycle management vision of WP6 and allow the system to remain current without manual intervention.
+
+\textbf{User feedback and drift detection.} Logging anonymised question-answer pairs and student satisfaction signals would enable evaluation of model quality over time and inform targeted retraining. A structured feedback loop would also support the teacher-in-the-loop validation approach described in the ethical considerations.
+
+\textbf{Cloud GPU deployment.} The Kubernetes manifests are ready for deployment on cloud providers with native GPU support. Deploying to a managed service such as AWS EKS with GPU node pools would validate the production scalability of the architecture and remove the WSL2 GPU passthrough limitation encountered locally.
+
+\textbf{Extending to additional subjects.} The modular architecture was explicitly designed to support new subjects with minimal changes. Adding a new subject requires preparing a QA dataset, training a LoRA adapter, populating a ChromaDB vector store, and adding one service entry to the Kubernetes manifests. This extensibility could be evaluated in a follow-on project.
+
+\textbf{University authentication.} The system currently has no authentication layer. Integrating institutional single sign-on via OAuth 2.0 or SAML using a student university email would restrict access to enrolled students, satisfy the GDPR access-control requirements outlined in the legal considerations, and enable personalisation based on the student's enrolled modules. Authentication would also provide the user identity necessary to associate persistent conversation history with individual accounts.
+
+\textbf{Conversation memory and persistent history.} The current implementation does not maintain conversational context between turns: each request to the model is treated as a standalone question, so the model has no awareness of what was asked or answered earlier in the same session. While the backend API accepts a history parameter and the frontend displays previous messages visually, prior exchanges are not included in the inference prompt in the current deployment, meaning follow-up questions such as "Can you explain that differently?" cannot be answered coherently. Implementing multi-turn context by passing the recent conversation history to the model on every request is the most immediate improvement that would make the tutor feel conversational rather than transactional. Beyond single-session memory, storing conversation history in a backend database and associating it with a user account would allow students to resume sessions across devices and give tutors visibility into recurring difficulties.
+
+
+\section{Personal Reflection}
+
+Before this project, I had no hands-on experience with training machine learning models. 
+Working on this dissertation gave me my first end-to-end exposure to the full workflow: data preparation, adapter training, evaluation, deployment, and iterative improvement.
+
+I learned how retrieval quality, prompt design, API behaviour, and frontend interaction all influence the final user experience. 
+This helped me move from a purely theoretical understanding of AI to a practical engineering perspective.
+
+If I repeated the work, I would ...
+
+Overall, this project marked a major step in my development: from having no prior model-training experience to being able to build and evaluate a complete AI tutor pipeline with clear technical and methodological justification.

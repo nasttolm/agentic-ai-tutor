@@ -5,10 +5,10 @@
 \usepackage{pgfgantt}
 \usepackage{pdfpages}
 \usepackage{tikz}
-\usetikzlibrary{arrows.meta,positioning,shapes.geometric,fit,backgrounds,calc}
 \usepackage{pdflscape}
 \usepackage{adjustbox}
 \usepackage{placeins}
+\usepackage{amsmath}
 \usepackage{booktabs}
 \usepackage{microtype}
 \usepackage{parskip}
@@ -53,8 +53,11 @@
     {\large \today}
 \end{titlepage}
 
+\clearpage
+\pagenumbering{gobble}
 \tableofcontents
 \clearpage
+\pagenumbering{arabic}
 
 % --------- Chapters ----------
 \input{chapters/intro}
@@ -62,6 +65,7 @@
 \input{chapters/tech_review}
 \input{chapters/methodology}
 \input{chapters/plan}
+\input{chapters/conclusions}
 \input{chapters/appendix}
 
 % --------- References ----------
