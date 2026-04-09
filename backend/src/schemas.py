@@ -35,15 +35,3 @@ class HealthResponse(BaseModel):
     status: str
     subjects_loaded: list[str]
     versions: dict[str, str] = {}
-    tts_available: bool = False
-    video_available: bool = False
-
-
-class TTSRequest(BaseModel):
-    text: str
-    subject: str
-
-
-class VideoRequest(BaseModel):
-    text: str
-    subject: str

@@ -81,6 +81,64 @@ def _prepend_silence(wav_bytes: bytes, duration_ms: int = 250) -> bytes:
     return buf_out.getvalue()
 
 
+def run_rhubarb(wav_bytes: bytes, dialogue: str = "") -> list[dict]:
+    """Run Rhubarb on WAV bytes, return mouth cues [{start, end, value}].
+    Returns empty list if Rhubarb is not installed or fails.
+    """
+    import subprocess, json, tempfile, os, shutil
+
+    if not shutil.which("rhubarb"):
+        return []
+
+    tmp_wav = tmp_txt = None
+    try:
+        with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as f:
+            f.write(wav_bytes)
+            tmp_wav = f.name
+
+        cmd = ["rhubarb", "-f", "json", "--machineReadable", "-q", tmp_wav]
+        if dialogue:
+            with tempfile.NamedTemporaryFile(suffix=".txt", delete=False,
+                                             mode="w", encoding="utf-8") as f:
+                f.write(dialogue)
+                tmp_txt = f.name
+            cmd += ["-d", tmp_txt]
+
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=15)
+        if result.returncode != 0:
+            logger.warning("Rhubarb failed: %s", result.stderr[:200])
+            return []
+        return json.loads(result.stdout).get("mouthCues", [])
+    except Exception as exc:
+        logger.warning("Rhubarb error: %s", exc)
+        return []
+    finally:
+        for p in [tmp_wav, tmp_txt]:
+            if p:
+                try:
+                    os.unlink(p)
+                except OSError:
+                    pass
+
+
+def split_sentences(text: str) -> list[str]:
+    """Split text into sentences for streaming synthesis."""
+    import re
+    parts = re.split(r'(?<=[.!?])\s+', text.strip())
+    return [s.strip() for s in parts if s.strip()]
+
+
+def synthesize_sentences(text: str):
+    """Yield (wav_bytes, cues) for each sentence. Used for streaming TTS."""
+    sentences = split_sentences(text)
+    if not sentences:
+        sentences = [text]
+    for sentence in sentences:
+        wav = synthesize(sentence)
+        cues = run_rhubarb(wav, sentence)
+        yield wav, cues
+
+
 def synthesize(text: str) -> bytes:
     """Synthesize text to WAV audio bytes. Raises RuntimeError if TTS not available."""
     if not is_tts_available():

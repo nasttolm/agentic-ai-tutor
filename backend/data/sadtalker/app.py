@@ -144,7 +144,7 @@ async def generate_video(audio: UploadFile):
                 data = get_facerender_data(
                     coeff_path, _models['crop_pic_path'],
                     _models['first_coeff_path'], str(audio_path),
-                    batch_size=2,
+                    batch_size=4,
                     input_yaw_list=None, input_pitch_list=None, input_roll_list=None,
                     expression_scale=1.0, still_mode=True,
                     preprocess=PREPROCESS, size=SIZE,

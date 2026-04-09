@@ -34,6 +34,7 @@ services:
     build:
       context: ./backend/data/sadtalker
     container_name: ai-tutor-sadtalker
+    profiles: ["sadtalker"]
     ports:
       - "7860:7860"
     environment:
@@ -66,7 +67,6 @@ services:
       - ./backend/data/piper:/app/data/piper
     depends_on:
       - fsd-chroma
-      - sadtalker
     deploy:
       resources:
         reservations:
@@ -97,7 +97,6 @@ services:
       - ./backend/data/piper:/app/data/piper
     depends_on:
       - fcs-chroma
-      - sadtalker
     deploy:
       resources:
         reservations:
@@ -128,7 +127,6 @@ services:
       - ./backend/data/piper:/app/data/piper
     depends_on:
       - dma-chroma
-      - sadtalker
     deploy:
       resources:
         reservations:

@@ -4,7 +4,7 @@ WORKDIR /app
 
 # Install system dependencies for bitsandbytes
 RUN apt-get update && apt-get install -y \
-    build-essential \
+    build-essential wget unzip \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Python dependencies
