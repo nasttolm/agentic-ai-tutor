@@ -42,8 +42,8 @@ AI Tutor system built from subject-specific Small Language Models (SLMs) for thr
 |-----------|------------|
 | Backend API | **FastAPI** (Python) |
 | Frontend | **Next.js** + React + TypeScript |
-| TTS | **Piper** (MIT license) |
-| Talking-head | **SadTalker** (Apache 2.0) |
+| TTS | **HeadTTS** (browser, primary) + Piper (backend option) |
+| Talking-head | **TalkingHead** (browser, primary) + SadTalker (optional video service) |
 
 Frontend preview:
 
@@ -87,33 +87,6 @@ agentic-ai-tutor/
 `- README.md
 ```
 
-<!--
-```
-agentic-ai-tutor/
-├── backend/               # FastAPI backend
-│   ├── src/
-│   │   ├── main.py        # API endpoints
-│   │   ├── inference.py   # Model inference + LoRA
-│   │   ├── rag.py         # ChromaDB retrieval
-│   │   ├── config.py      # Configuration
-│   │   └── schemas.py     # Pydantic models
-│   ├── data/              # LoRA adapters + RAG indices
-│   └── requirements.txt
-├── frontend/              # Next.js frontend
-│   ├── app/
-│   │   ├── page.tsx       # Main chat page
-│   │   └── components/    # React components
-│   └── lib/api.ts         # API client
-├── dissertation/          # LaTeX source
-│   ├── main.tex
-│   ├── chapters/
-│   └── figs/
-├── notebooks/             # Colab notebooks
-│   ├── FinalProject.ipynb         # Full pipeline
-│   └── FinalProject_metrics.ipynb # Evaluation
-├── docker-compose.yml
-└── README.md
--->
 
 ## Architecture
 
@@ -145,10 +118,10 @@ Deployed as isolated subject services (FSD/FCS/DMA), each with its own backend a
 
 ### Mode 1 - Microservices (recommended for demo)
 
-Runs all 8 containers: 3 FastAPI backends, 3 ChromaDB instances, SadTalker, Frontend.
+Runs all 8 containers (including SadTalker): 3 FastAPI backends, 3 ChromaDB instances, SadTalker, Frontend.
 
 ```bash
-docker compose -f docker-compose.microservices.yml up --build
+docker compose -f docker-compose.microservices.yml --profile sadtalker up --build
 ```
 
 - Frontend: http://localhost:3000
@@ -156,6 +129,11 @@ docker compose -f docker-compose.microservices.yml up --build
 - FCS API: http://localhost:8002/health
 - DMA API: http://localhost:8003/health
 - SadTalker: http://localhost:7860/health
+
+If you do not need SadTalker, run without profile:
+```bash
+docker compose -f docker-compose.microservices.yml up --build
+```
 
 Expected local container layout:
 
@@ -192,7 +170,7 @@ uvicorn src.main:app --reload
 
 # Terminal 3 - Frontend
 cd frontend
-npm run dev
+npm run dev -- --webpack
 ```
 
 - Frontend: http://localhost:3000
@@ -289,3 +267,4 @@ kubectl apply -f k8s/argo/application.yaml
 Supervisor: Brahim El Boudani
 
 London South Bank University, 2026
+
