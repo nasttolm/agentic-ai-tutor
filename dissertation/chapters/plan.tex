@@ -652,25 +652,6 @@ As shown in Figure \ref{fig:deployment}, the system consists of four main layers
 
 This separation improves fault isolation, since a failure in one subject-specific service does not directly interrupt the others. Each service can be restarted, updated, and scaled independently. In Kubernetes, each service is managed by its own Deployment, which maintains multiple underlying pod instances, automatically restarts failed replicas, and supports scaling up or down in response to demand. In addition, retrieval storage is externalised into a dedicated ChromaDB instance for each subject. For that reason the application layer remains stateless at runtime, which simplifies dynamic scaling. Because each subject has its own Deployment, database, and embedded LoRA adapter, the services can be scaled independently according to subject-specific traffic and resource requirements.
 
-Figure \ref{fig:kubernetes-cli} shows the deployed Kubernetes resources in the ai-tutor namespace. The output includes pods, services, and deployments for the frontend, subject-specific backend services, and ChromaDB instances, all in a running state.
-
-\begin{figure}[h]
-    \centering
-    \includegraphics[width=\linewidth]{figs/kubernetes_cli.png}
-    \caption{Kubernetes resources showing running pods, services, and deployments for the ai-tutor application.}
-    \label{fig:kubernetes-cli}
-\end{figure}
-\FloatBarrier
-
-Figure \ref{fig:kubernetes-ui} shows the Kubernetes resources as visualised in Docker Desktop. All deployments are in an available state, and all pods are running successfully. The system consists of subject-specific backend services, corresponding ChromaDB instances, and a frontend application, each deployed as separate components within the ai-tutor namespace.
-\begin{figure}[h]
-    \centering
-    \includegraphics[width=\linewidth]{figs/kubernetes_ui.png}
-    \caption{Kubernetes dashboard in Docker Desktop showing deployments, pods, services, and cluster status for the ai-tutor application.}
-    \label{fig:kubernetes-ui}
-\end{figure}
-\FloatBarrier
-
 \subsection{Backend service}
 
 Each backend microservice is a FastAPI application that combines a LoRA-adapted language model with a retrieval-augmented generation (RAG) pipeline. The same Docker image is used for all three subjects. The subject configuration file subjects.yaml and the subject-specific LoRA adapters are baked into the backend image during the Docker build. At runtime, the SUBJECT environment variable selects which subject configuration and embedded LoRA adapter to activate, and determines which external ChromaDB instance inside the Kubernetes cluster the service connects to.
@@ -793,10 +774,29 @@ Figure \ref{fig:docker-containers} shows the local microservices deployment, whe
 
 \subsection{Kubernetes orchestration}
 
-For production deployment, the system is orchestrated with Kubernetes. All resources are defined declaratively in YAML manifests managed by Kustomize.
+For production deployment, the system is orchestrated with Kubernetes. All resources aare defined declaratively in YAML manifests managed by Kustomize.
 
 \paragraph{Namespace and storage.}
 All resources reside in a dedicated ai-tutor namespace to isolate them from other workloads on the cluster. Each subject has a dedicated ChromaDB Deployment running the chromadb/chroma image, backed by its own 10\,Gi PersistentVolumeClaim (fsd-chroma-pvc, fcs-chroma-pvc, dma-chroma-pvc) with ReadWriteOnce access. A corresponding ClusterIP Service exposes each ChromaDB instance under a stable DNS name (e.g.\ fsd-chroma) that the backend Deployment references via the CHROMA\_HOST environment variable.
+
+Figure \ref{fig:kubernetes-cli} shows the deployed Kubernetes resources in the ai-tutor namespace. The output includes pods, services, and deployments for the frontend, subject-specific backend services, and ChromaDB instances, all in a running state.
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=\linewidth]{figs/kubernetes_cli.png}
+    \caption{Kubernetes resources showing running pods, services, and deployments for the ai-tutor application.}
+    \label{fig:kubernetes-cli}
+\end{figure}
+\FloatBarrier
+
+Figure \ref{fig:kubernetes-ui} shows the Kubernetes resources as visualised in Docker Desktop. All deployments are in an available state, and all pods are running successfully. The system consists of subject-specific backend services, corresponding ChromaDB instances, and a frontend application, each deployed as separate components within the ai-tutor namespace.
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=\linewidth]{figs/kubernetes_ui.png}
+    \caption{Kubernetes dashboard in Docker Desktop showing deployments, pods, services, and cluster status for the ai-tutor application.}
+    \label{fig:kubernetes-ui}
+\end{figure}
+\FloatBarrier
 
 \paragraph{Backend Deployments.}
 Each subject (FSD, FCS, DMA) has its own Kubernetes Deployment with the following configuration:
