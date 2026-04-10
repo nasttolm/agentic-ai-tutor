@@ -1,13 +1,13 @@
 # Scalable Agentic AI Tutor (SLMs + LoRA + RAG + MLOps)
 
-MSc dissertation project — London South Bank University
+MSc dissertation project - London South Bank University
 
 ## Overview
 
 AI Tutor system built from subject-specific Small Language Models (SLMs) for three academic modules:
-- **FSD** — Fundamentals of Software Development
-- **FCS** — Fundamentals of Computer Science
-- **DMA** — Discrete Mathematics
+- **FSD** - Fundamentals of Software Development
+- **FCS** - Fundamentals of Computer Science
+- **DMA** - Discrete Mathematics
 
 ## Technology Stack
 
@@ -45,6 +45,11 @@ AI Tutor system built from subject-specific Small Language Models (SLMs) for thr
 | TTS | **Piper** (MIT license) |
 | Talking-head | **SadTalker** (Apache 2.0) |
 
+Frontend preview:
+
+![Frontend Main UI](dissertation/figs/frontend_ui_main.png)
+![Frontend Sources UI](dissertation/figs/frontend_ui_sources.png)
+
 ### Evaluation Metrics (Completed)
 
 | Metric | Purpose |
@@ -58,6 +63,31 @@ Results available in `dissertation/chapters/plan.tex` (Model evaluation section)
 
 ## Project Structure
 
+```text
+agentic-ai-tutor/
+|- backend/                         # FastAPI services, inference, RAG
+|  |- src/                          # main.py, inference.py, rag.py, schemas.py
+|  |- data/                         # adapters, chroma data, runtime assets
+|  |- subjects.yaml                 # subject-level config and versions
+|  `- requirements.txt
+|- frontend/                        # Next.js UI
+|  |- app/                          # pages and components
+|  |- lib/                          # API client
+|  |- scripts/                      # build/runtime helper scripts
+|  `- playwright.config.ts
+|- k8s/                             # Kubernetes manifests (app + infra)
+|  |- argo/                         # Argo CD AppProject/Application
+|  `- ...                           # deployments, services, storage, ingress
+|- .github/workflows/               # GitHub Actions CI pipeline
+|- dissertation/                    # LaTeX source (chapters + figures)
+|- notebooks/                       # training/evaluation notebooks
+|- tests/                           # project-level tests
+|- docker-compose.yml               # monolithic local mode
+|- docker-compose.microservices.yml # multi-service local mode
+`- README.md
+```
+
+<!--
 ```
 agentic-ai-tutor/
 ├── backend/               # FastAPI backend
@@ -83,70 +113,26 @@ agentic-ai-tutor/
 │   └── FinalProject_metrics.ipynb # Evaluation
 ├── docker-compose.yml
 └── README.md
-```
+-->
 
 ## Architecture
 
 ### Training Pipeline
-```
-┌─────────────────────────────────────────────────────────────┐
-│                     COURSE MATERIALS                         │
-│                  (PDF, PPTX, DOCX from Moodle)               │
-└─────────────────────────┬───────────────────────────────────┘
-                          │
-                          ▼
-┌─────────────────────────────────────────────────────────────┐
-│                   DATA PROCESSING                            │
-│         Topic extraction → Chunking → QA Generation          │
-└─────────────────────────┬───────────────────────────────────┘
-                          │
-            ┌─────────────┴─────────────┐
-            ▼                           ▼
-┌───────────────────────┐   ┌───────────────────────┐
-│    LoRA FINE-TUNING   │   │     RAG INDEXING      │
-│  (Phi-4-mini + PEFT)  │   │ (ChromaDB + embeddings)│
-└───────────────────────┘   └───────────────────────┘
-```
+Course materials are processed into topic chunks and QA pairs, then used for LoRA adapter training and subject-specific RAG indexing.
+
+Reference architecture diagram:
+
+![Deployment Pipeline](dissertation/figs/Deployment-Pipeline.png)
 
 ### CI/CD Pipeline
-```
-┌──────────────┐      ┌──────────────┐      ┌──────────────┐
-│    GitHub    │      │    GHCR      │      │   Argo CD    │
-│   Actions    │ ───► │   (Images)   │ ───► │   (GitOps)   │
-│   (CI)       │      │              │      │   (CD)       │
-└──────────────┘      └──────────────┘      └──────────────┘
-```
+GitHub Actions builds and validates images, pushes them to GHCR, and Argo CD reconciles Kubernetes state from Git.
+
+Pipeline in practice:
+
+![GitHub Actions Pipeline](dissertation/figs/github_actions.png)
 
 ### Deployment (Microservices)
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│                        KUBERNETES / EKS                              │
-│                                                                      │
-│  ┌─────────────────────────────────────────────────────────────┐    │
-│  │                        INGRESS                               │    │
-│  └───────────┬─────────────────┬─────────────────┬─────────────┘    │
-│              │                 │                 │                   │
-│      ┌───────▼───────┐ ┌───────▼───────┐ ┌───────▼───────┐          │
-│      │  FSD Service  │ │  FCS Service  │ │  DMA Service  │          │
-│      │  (FastAPI)    │ │  (FastAPI)    │ │  (FastAPI)    │          │
-│      ├───────────────┤ ├───────────────┤ ├───────────────┤          │
-│      │ Phi-4-mini    │ │ Phi-4-mini    │ │ Phi-4-mini    │          │
-│      │ + LoRA (FSD)  │ │ + LoRA (FCS)  │ │ + LoRA (DMA)  │          │
-│      │ + RAG (FSD)   │ │ + RAG (FCS)   │ │ + RAG (DMA)   │          │
-│      │ + Piper TTS   │ │ + Piper TTS   │ │ + Piper TTS   │          │
-│      └───────┬───────┘ └───────┬───────┘ └───────┬───────┘          │
-│              │                 │                 │                   │
-│              ▼                 ▼                 ▼                   │
-│      ┌─────────────────────────────────────────────────────┐        │
-│      │                  GPU NODE (CUDA)                     │        │
-│      └─────────────────────────────────────────────────────┘        │
-│                                                                      │
-│  ┌─────────────────┐      ┌─────────────────┐                       │
-│  │    Frontend     │      │   SadTalker     │                       │
-│  │   (Next.js)     │      │  (Video Gen)    │                       │
-│  └─────────────────┘      └─────────────────┘                       │
-└─────────────────────────────────────────────────────────────────────┘
-```
+Deployed as isolated subject services (FSD/FCS/DMA), each with its own backend and ChromaDB, plus a shared frontend and ingress routing.
 
 ## Quick Start
 
@@ -157,7 +143,7 @@ agentic-ai-tutor/
 
 ---
 
-### Mode 1 — Microservices (recommended for demo)
+### Mode 1 - Microservices (recommended for demo)
 
 Runs all 8 containers: 3 FastAPI backends, 3 ChromaDB instances, SadTalker, Frontend.
 
@@ -171,9 +157,13 @@ docker compose -f docker-compose.microservices.yml up --build
 - DMA API: http://localhost:8003/health
 - SadTalker: http://localhost:7860/health
 
+Expected local container layout:
+
+![Docker Containers](dissertation/figs/docker_containers.png)
+
 ---
 
-### Mode 2 — Monolithic (single backend, all 3 subjects)
+### Mode 2 - Monolithic (single backend, all 3 subjects)
 
 ```bash
 docker compose up --build
@@ -184,15 +174,15 @@ docker compose up --build
 
 ---
 
-### Mode 3 — Local development (no Docker, hot reload)
+### Mode 3 - Local development (no Docker, hot reload)
 
 Requires Python venv and ChromaDB installed locally.
 
 ```bash
-# Terminal 1 — ChromaDB for one subject
+# Terminal 1 - ChromaDB for one subject
 chroma run --path ./backend/data/rag/fsd/chroma_store --port 8001
 
-# Terminal 2 — Backend
+# Terminal 2 - Backend
 cd backend
 source venv/Scripts/activate   # Windows (Git Bash)
 # source venv/bin/activate      # Linux/Mac
@@ -200,7 +190,7 @@ SUBJECT=fsd CHROMA_HOST=localhost CHROMA_PORT=8001 \
 TTS_ENABLED=true SADTALKER_URL=http://localhost:7860 \
 uvicorn src.main:app --reload
 
-# Terminal 3 — Frontend
+# Terminal 3 - Frontend
 cd frontend
 npm run dev
 ```
@@ -210,7 +200,7 @@ npm run dev
 
 ---
 
-### Mode 4 — Kubernetes (Minikube)
+### Mode 4 - Kubernetes (Minikube)
 
 ```bash
 minikube start --driver=docker --gpus=all --memory=8192
@@ -219,6 +209,11 @@ kubectl get pods -n ai-tutor
 ```
 
 See `k8s/` for full manifests.
+
+Kubernetes runtime examples:
+
+![Kubernetes UI](dissertation/figs/kubernetes_ui.png)
+![Kubernetes CLI](dissertation/figs/kubernetes_cli.png)
 
 ---
 
@@ -256,6 +251,10 @@ kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.pas
 ```
 Username: `admin`
 
+Argo CD application view:
+
+![Argo CD Application View](dissertation/figs/argo_cd.png)
+
 Note for local Docker Desktop:
 - `Ingress` may remain `Progressing` because AWS ALB annotations in `k8s/ingress.yaml` are cloud-specific.
 - Core services and pods can still be healthy and running.
@@ -286,5 +285,7 @@ kubectl apply -f k8s/argo/application.yaml
 ## Author
 
 **Anastasia Tolmacheva**
+
 Supervisor: Brahim El Boudani
+
 London South Bank University, 2026
