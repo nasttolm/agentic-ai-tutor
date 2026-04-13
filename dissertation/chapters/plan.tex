@@ -385,7 +385,7 @@ BLEU-2 & Percent scale & 0-100 \\
 ROUGE-L & Fraction (float) & 0.0-1.0 \\
 METEOR & Fraction (float) & 0.0-1.0 \\
 BERTScore F1 & Fraction (float), rescaled & 0.0-1.0 \\
-Latency (mean / median) & Seconds & No fixed range \\
+Latency (mean) & Seconds & No fixed range \\
 \bottomrule
 \end{tabular}}
 \end{table}
@@ -404,7 +404,7 @@ METEOR aligns candidate and reference using unigram matches (including stemming 
 BERTScore compares candidate and reference using contextual embeddings and reports F1 similarity \parencite{Zhang2019BERTScore}. Higher values mean the meaning is closer even if words differ. 
 
 \paragraph{Latency.}
-Latency is reported as mean and median inference time per example (seconds). Lower is better.
+Latency is reported as mean inference time per example (seconds). Lower is better.
 
 \subsection{Results}
 
@@ -418,7 +418,7 @@ For each metric column:
     \item \textcolor{red}{Red} marks the \textbf{worst} value in that column.
 \end{itemize}
 For quality metrics (BLEU, ROUGE-L, METEOR, BERTScore F1) and throughput (TPS), \textbf{higher is better}.
-For latency (mean/median seconds), \textbf{lower is better}.
+For latency (mean seconds), \textbf{lower is better}.
 
 \begin{table}[h]
 \centering
@@ -583,14 +583,6 @@ Figures \ref{fig:all-lat-mean}-\ref{fig:all-n-tok-mean} compare the runtime beha
 
 \begin{figure}[h]
     \centering
-    \includegraphics[width=\linewidth]{figs/all_latency_median.png}
-    \caption{Median latency (seconds) across subjects for models with available runtime measurements.}
-    \label{fig:all-lat-median}
-\end{figure}
-\FloatBarrier
-
-\begin{figure}[h]
-    \centering
     \includegraphics[width=\linewidth]{figs/all_tps_mean.png}
     \caption{Mean tokens per second (TPS) across subjects for models with available runtime measurements.}
     \label{fig:all-tps-mean}
@@ -605,7 +597,7 @@ Figures \ref{fig:all-lat-mean}-\ref{fig:all-n-tok-mean} compare the runtime beha
 \end{figure}
 \FloatBarrier
 
-The latency plots show that the deployed LoRA-based SLM variants provide lower end-to-end response times than the measured external LLM baseline in this setup. Across all three subjects, LoRA typically achieves the lowest mean latency, while LoRA+RAG remains close behind and occasionally attains the best median latency. The retrieval step only slightly increases runtime.
+The latency plots show that the deployed LoRA-based SLM variants provide lower end-to-end response times than the measured external LLM baseline in this setup. Across all three subjects, LoRA typically achieves the lowest mean latency. The retrieval step only slightly increases runtime.
 
 The throughput results provide a complementary view. The BASE model consistently achieves the highest TPS, whereas LoRA, LoRA+RAG, and Qwen3-32B generate tokens more slowly. However, the token-count plot shows that BASE also produces substantially longer outputs on average. As a result, higher token throughput does not translate into lower overall latency. In contrast, LoRA and LoRA+RAG combine moderate throughput with much shorter generations, which explains their lower response times.
 

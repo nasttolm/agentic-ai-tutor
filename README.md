@@ -42,8 +42,8 @@ AI Tutor system built from subject-specific Small Language Models (SLMs) for thr
 |-----------|------------|
 | Backend API | **FastAPI** (Python) |
 | Frontend | **Next.js** + React + TypeScript |
-| TTS | **HeadTTS** (browser, primary) + Piper (backend option) |
-| Talking-head | **TalkingHead** (browser, primary) + SadTalker (optional video service) |
+| TTS | **HeadTTS** (browser) |
+| Talking-head | **TalkingHead** (browser) |
 
 Frontend preview:
 
@@ -118,22 +118,16 @@ Deployed as isolated subject services (FSD/FCS/DMA), each with its own backend a
 
 ### Mode 1 - Microservices (recommended for demo)
 
-Runs all 8 containers (including SadTalker): 3 FastAPI backends, 3 ChromaDB instances, SadTalker, Frontend.
+Runs 7 containers: 3 FastAPI backends, 3 ChromaDB instances, 1 frontend.
 
 ```bash
-docker compose -f docker-compose.microservices.yml --profile sadtalker up --build
+docker compose -f docker-compose.microservices.yml up --build
 ```
 
 - Frontend: http://localhost:3000
 - FSD API: http://localhost:8001/health
 - FCS API: http://localhost:8002/health
 - DMA API: http://localhost:8003/health
-- SadTalker: http://localhost:7860/health
-
-If you do not need SadTalker, run without profile:
-```bash
-docker compose -f docker-compose.microservices.yml up --build
-```
 
 Expected local container layout:
 
@@ -165,7 +159,6 @@ cd backend
 source venv/Scripts/activate   # Windows (Git Bash)
 # source venv/bin/activate      # Linux/Mac
 SUBJECT=fsd CHROMA_HOST=localhost CHROMA_PORT=8001 \
-TTS_ENABLED=true SADTALKER_URL=http://localhost:7860 \
 uvicorn src.main:app --reload
 
 # Terminal 3 - Frontend

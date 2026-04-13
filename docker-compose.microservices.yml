@@ -30,27 +30,6 @@ services:
   # ============================================================================
   # Backend Services (one per subject)
   # ============================================================================
-  sadtalker:
-    build:
-      context: ./backend/data/sadtalker
-    container_name: ai-tutor-sadtalker
-    profiles: ["sadtalker"]
-    ports:
-      - "7860:7860"
-    environment:
-      - SADTALKER_DEVICE=cuda
-    volumes:
-      - ./backend/data/sadtalker/checkpoints:/sadtalker/checkpoints
-      - ./backend/data/sadtalker/gfpgan:/app/gfpgan
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: 1
-              capabilities: [gpu]
-    restart: unless-stopped
-
   fsd-service:
     build: ./backend
     container_name: ai-tutor-fsd
@@ -60,11 +39,6 @@ services:
       - SUBJECT=fsd
       - CHROMA_HOST=fsd-chroma
       - CHROMA_PORT=8000
-      - SADTALKER_URL=http://sadtalker:7860
-      - SADTALKER_TIMEOUT=600
-      - TTS_ENABLED=true
-    volumes:
-      - ./backend/data/piper:/app/data/piper
     depends_on:
       - fsd-chroma
     deploy:
@@ -90,11 +64,6 @@ services:
       - SUBJECT=fcs
       - CHROMA_HOST=fcs-chroma
       - CHROMA_PORT=8000
-      - SADTALKER_URL=http://sadtalker:7860
-      - SADTALKER_TIMEOUT=600
-      - TTS_ENABLED=true
-    volumes:
-      - ./backend/data/piper:/app/data/piper
     depends_on:
       - fcs-chroma
     deploy:
@@ -120,11 +89,6 @@ services:
       - SUBJECT=dma
       - CHROMA_HOST=dma-chroma
       - CHROMA_PORT=8000
-      - SADTALKER_URL=http://sadtalker:7860
-      - SADTALKER_TIMEOUT=600
-      - TTS_ENABLED=true
-    volumes:
-      - ./backend/data/piper:/app/data/piper
     depends_on:
       - dma-chroma
     deploy:

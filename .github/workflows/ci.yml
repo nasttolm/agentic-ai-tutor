@@ -29,14 +29,11 @@ jobs:
           python -m py_compile backend/src/main.py
           python -m py_compile backend/src/schemas.py
           python -m py_compile backend/src/logging_config.py
-          python -m py_compile backend/src/tts.py
-          python -m py_compile backend/src/sadtalker.py
-          python -m py_compile backend/data/sadtalker/app.py
 
       - name: Bandit security scan
         run: |
           pip install bandit
-          bandit -r backend/src/ backend/data/sadtalker/app.py -ll -q || true
+          bandit -r backend/src/ -ll -q || true
 
       - uses: actions/setup-node@v4
         with:
