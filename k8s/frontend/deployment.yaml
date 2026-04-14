@@ -21,7 +21,7 @@ spec:
       containers:
         - name: frontend
           image: ghcr.io/nasttolm/ai-tutor-frontend:latest
-          imagePullPolicy: Never
+          imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 3000
           env:
