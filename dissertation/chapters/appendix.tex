@@ -11,6 +11,8 @@ Key directories:
   \item \texttt{k8s/} - Kubernetes manifests
   \item \texttt{k8s/argo/} - Argo CD AppProject and Application
   \item \texttt{notebooks/} - training and evaluation notebooks
+  \item \texttt{dissertation/} - dissertation source chapters and figures
+  \item \texttt{.github/workflows/} - CI pipeline and GitOps automation workflows
 \end{itemize}
 
 \section{Originality \& Use of Generative AI Statement}
@@ -23,7 +25,7 @@ I confirm that this coursework submission is all my own, original work and that 
 I DID use Generative AI technology in the development, writing, or editing of this assignment.
 
 \textbf{1. Tools and purposes of use}
-
+ 
 ChatGPT was used to improve the grammar and academic tone of the written sections of the report. The tool assisted in rephrasing sentences and ensuring that explanations were presented in a clear and professional academic style. All ideas, arguments, explanations, and conceptual content in the report are entirely my own. It was only used to polish the writing while preserving my original meaning.
 
 Claude Code (Anthropic) was used during the implementation phase to accelerate development. It supported code generation and refactoring. The tool helped speed up routine programming tasks. All design decisions and solutions were created and controlled by me. AI did not design the system, propose features, or decide what should be implemented. It only supported execution of tasks that I had already planned or specified.
@@ -32,22 +34,21 @@ Claude Code (Anthropic) was used during the implementation phase to accelerate d
 
 ChatGPT was used across the entire report for improving clarity and academic style, while all ideas, explanations, and arguments remained my own.
 
-Claude Code were used only to speed up routine tasks based on instructions and requirements that I defined.
-
+Claude Code was used to speed up implementation tasks based on instructions and requirements that I defined, including drafting specific code sections and refining existing logic.
 
 \textbf{3. Examples of prompts used}
 \begin{itemize}
     \item Improve the academic tone and clarity of this paragraph while keeping the meaning unchanged.
     \item Rewrite this section to ensure better logical flow and reduce repetition.
-    \item Refactor this function to make the code more efficient and readable.
-    \item Write a Python function def generate\_qa\_from\_context(model\_manager, context, num\_questions) that uses a local Phi-4-mini-instruct model to generate question-answer pairs from a text chunk. The function should build a clear prompt that asks for exactly num\_questions numbered Qn/An pairs, parse the output with a regex that extracts the Qn/An blocks and return a list of dicts with question and answer fields.
+    \item Plan the implementation steps for integrating optional browser-based audio playback and talking-head avatar controls in the frontend, including state handling and button behaviour.
+    \item Write the FastAPI endpoint logic for /api/chat that validates the subject, retrieves RAG context, incorporates message history, and returns an answer with source snippets.
 \end{itemize}
 
 \textbf{4. Reflection and Limitations}
 
-Although AI tools were helpful for improving readability and accelerating repetitive development tasks, they did not replace my own thinking or decision-making. I verified every suggestion manually to ensure accuracy, correctness, and alignment with my original ideas.
+Although AI tools were helpful for improving readability and accelerating development tasks, they did not replace my own thinking or decision-making. I verified every suggestion manually to ensure accuracy, correctness, and alignment with my original ideas.
 
-Fore example, ChatGPT occasionally introduced logical inconsistencies, change the meaning of sentences, or added unnecessary details. Because of this, I had to carefully reread and correct all AI-assisted text. This leads to double work, as I needed to ensure that my original logic and intentions remained intact.
+For example, ChatGPT occasionally introduced logical inconsistencies, changed the meaning of sentences, or added unnecessary details. Because of this, I had to carefully reread and correct all AI-assisted text. This led to double work, as I needed to ensure that my original logic and intentions remained intact.
 
 Similarly, Claude Code required validation, since automatically generated code or refactoring suggestions were not always optimal or consistent with the architecture I had designed. I retained full control over the development process, including decision-making, system design, and implementation.
 

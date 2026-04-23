@@ -82,7 +82,7 @@ After reviewing the benchmark data and official technical reports, Phi-4-mini-in
 
 It ranks first in Average score (29.41\%) and IFEval (73.78\%), indicating strong generalisation and dialogue precision while maintaining the lowest environmental cost (0.83 kg CO\textsubscript{2}). By contrast, Phi-3.5-mini-instruct consumes almost nine times more energy (7.39 kg CO\textsubscript{2}), and Qwen2.5-3B has weaker reasoning performance (25.05\% MMLU-Pro) \parencite{HuggingFaceLeaderboard2025}.
 
-Phi-4’s use of reasoning-dense, “textbook-like” synthetic data makes it well suited for academic tutoring tasks, where factual reliability and contextual grounding via RAG are critical. Its MIT license further supports transparent fine-tuning and on-premise deployment within university infrastructure \parencite{microsof61:online,Empoweri69:online}.
+Phi-4’s use of reasoning-dense, textbook-like synthetic data makes it well suited for academic tutoring tasks, where factual reliability and contextual grounding via RAG are critical. Its MIT license further supports transparent fine-tuning and on-premise deployment within university infrastructure \parencite{microsof61:online,Empoweri69:online}.
 
 Therefore, Phi-4-mini-instruct was selected as the optimal trade-off between accuracy, interpretability, efficiency, and open educational applicability.
 
@@ -156,7 +156,7 @@ LoRA, by contrast, balances speed, simplicity, memory efficiency, and training s
 \section{Multimodal Response Delivery}
 
 \subsection{Requirements}
-The multimodal output layer extends text-based tutoring with optional speech and a short avatar-style video response. The component selection was guided by the following requirements:
+The multimodal output layer extends text-based tutoring with optional speech and real-time talking-head avatar rendering in the browser. The component selection was guided by the following requirements:
 \begin{enumerate}
     \item \textbf{Avatar synchronisation}  
     The solution should support synchronised visual speech (e.g. lip movement), requiring access to phoneme-level timing or viseme data for accurate animation.
@@ -166,8 +166,8 @@ The multimodal output layer extends text-based tutoring with optional speech and
     The system should support low-latency speech and animation, enabling interactive responses rather than delayed, pre-rendered outputs.
     \item \textbf{Institutional suitability}  
     Components should be compatible with university deployment, including predictable licensing and the ability to control how models and data are used.
-    \item \textbf{Modular design}  
-    Speech and video generation should be implemented as replaceable modules so that institutions can swap providers if policies change.
+    \item \textbf{Modular design}
+    Speech synthesis and avatar rendering should be implemented as replaceable modules so that institutions can swap providers if policies change.
     \end{enumerate}
 
 \subsection{Text-to-Speech Options}
@@ -180,13 +180,10 @@ The multimodal output layer extends text-based tutoring with optional speech and
 
 \textbf{Coqui TTS} is an alternative open-source TTS toolkit. The repository is distributed under the Mozilla Public License 2.0 (MPL-2.0), as stated in the project license file. The Coqui documentation describes .models.json as a pretrained model list. The repository file TTS/.models.json includes a license field for pretrained model entries. In addition, the Coqui documentation states that "This model is licensed under Coqui Public Model License." Together, these sources provide licensing information at both the toolkit and model level. However, because a model can have its own stated license, deployment requires checking the license of the specific pretrained model artifact being used. \parencite{TTSLICEN25:online, TTSTTSmo24:online}
 
-\textbf{Mimic 3} is another local TTS option. Its repository states that Mimic 3 is available under the AGPL v3 license. This provides a clear licensing signal, but it is a different licensing model compared to permissive licenses such as MIT and may be treated differently by institutional policy. \parencite{mimic3Repo:online, mimic3License:online}
-
-
 \subsection{TTS Selection Rationale}
 HeadTTS was selected as the default TTS engine because it directly satisfies requirements. It provides both audio and viseme information and operates in the browser, enabling real-time interaction without additional backend infrastructure.
 
-In contrast, Piper, Coqui TTS, and Mimic 3 focus on audio-only generation and would require additional processing to extract timing or viseme data. This introduces additional complexity and latency, making them less suitable for an interactive avatar system. While these tools offer advantages in licensing clarity or offline deployment, they do not align as closely with the real-time animation requirements.
+In contrast, Piper and Coqui TTS focus on audio-only generation and would require additional processing to extract timing or viseme data. This introduces additional complexity and latency, making them less suitable for an interactive avatar system. While these tools offer advantages in licensing clarity or offline deployment, they do not align as closely with the real-time animation requirements.
 
 \subsection{Talking-Head}
 \textbf{TalkingHead} is a browser-based avatar rendering and animation system that enables real-time talking-head generation. It operates by rendering a 3D avatar and driving lip synchronisation using audio and viseme data, rather than generating pre-rendered video. This allows tight integration with real-time TTS systems such as HeadTTS and enables low-latency interaction. Unlike offline video generation approaches, TalkingHead performs animation directly in the client environment, removing the need for a separate video generation pipeline. \parencite{met4citi37:online}
@@ -205,41 +202,43 @@ In contrast, SadTalker generates pre-rendered video, which introduces latency an
 \section{Frontend Framework}
 
 \subsection{Requirements}
-The frontend is responsible for the user-facing tutoring experience. In this project, it must support a subject-first flow (selecting a subject before tutoring), a chat interface with low perceived latency, and asynchronous delivery of optional video responses. The frontend framework selection was guided by the following requirements:
+The frontend is responsible for the user-facing tutoring experience. In this project, it must support a subject-first flow (selecting a subject before tutoring), a chat interface with low perceived latency, and optional real-time multimodal output (speech and avatar rendering) in the browser. The frontend framework selection was guided by the following requirements:
 
 \begin{enumerate}
     \item \textbf{Chat-first interaction}
     The interface must support a conversational flow where text answers are displayed immediately.
-    \item \textbf{Asynchronous video workflow}
-    Since video generation can take longer, the UI must support a background-job pattern and display video once available.
-    \item \textbf{Standard media rendering}
-    The frontend must support playback of generated MP4 outputs using standard web capabilities.
+    \item \textbf{Real-time multimodal workflow}
+    The UI should support optional browser-based speech synthesis and avatar animation without requiring backend video generation jobs.
+    \item \textbf{Browser media and rendering support}
+    The frontend must support standard web audio and real-time 3D/avatar rendering capabilities.
     \item \textbf{Institutional deployment fit}
     The solution should be suitable for a university environment, including self-hosted deployments and clear, documentation-backed implementation patterns.
 \end{enumerate}
 
 \subsection{Frontend Framework Options}
 
-The \textbf{Next.js} documentation states that Route Handlers allow you to create custom request handlers for a given route using the Web Request and Response APIs. It also states that Route Handlers are only available inside the app directory. This provides a documented mechanism to implement request/response endpoints for actions such as starting a video generation job and checking its status, which supports the asynchronous video workflow requirement. It also supports maintainability and institutional deployment fit by relying on an official, documented pattern for request handlers within the application structure. A potential trade-off is that this approach couples the UI framework to a specific file-based routing structure (the app directory), which the project must follow. \parencite{GettingS41:online,}
+The \textbf{Next.js} documentation states that Route Handlers allow you to create custom request handlers for a given route using the Web Request and Response APIs. It also states that Route Handlers are only available inside the app directory. This provides a documented mechanism to implement frontend-adjacent request/response endpoints and integration patterns, while keeping the app structure maintainable for institutional deployment. A potential trade-off is that this approach couples the UI framework to a specific file-based routing structure (the app directory), which the project must follow. \parencite{GettingS41:online}
 
-The \textbf{SvelteKit} documentation states that API routes can be created by adding a +server.js file exporting functions corresponding to HTTP methods such as GET, PUT, POST, PATCH and DELETE. This provides a documented way to implement request handlers for job submission and status queries, supporting the asynchronous video workflow requirement. As with Next.js, the approach relies on a specific file-based convention +server.js, which the project must adopt for maintainability. \parencite{DocsSve12:online}
+The \textbf{SvelteKit} documentation states that API routes can be created by adding a +server.js file exporting functions corresponding to HTTP methods such as GET, PUT, POST, PATCH and DELETE. This provides a documented way to implement request handlers and integration endpoints when needed. As with Next.js, the approach relies on a specific file-based convention (+server.js), which the project must adopt for maintainability. \parencite{DocsSve12:online}
 
-The \textbf{Vite} documentation states that during development, Vite assumes that a modern browser is used and that Vite sets esnext as the transform target. This documentation emphasises development assumptions and build targets, which supports a modern web UI suitable for chat and media rendering. However, in the cited source Vite is not described as providing an API-route mechanism in the same way as Next.js Route Handlers or SvelteKit +server.js handlers. Therefore, implementing the asynchronous video workflow endpoints would rely on a separate backend service rather than a documented framework-level routing feature on this page. \parencite{GettingS68:online}
+The \textbf{Vite} documentation states that during development, Vite assumes that a modern browser is used and that Vite sets esnext as the transform target. This documentation emphasises development assumptions and build targets, which supports a modern web UI suitable for chat and media rendering. However, in the cited source Vite is not described as providing an API-route mechanism in the same way as Next.js Route Handlers or SvelteKit +server.js handlers. Therefore, integration endpoints would rely on a separate backend service rather than a documented framework-level routing feature on this page. \parencite{GettingS68:online}
+
 
 \subsection{Frontend Selection Rationale}
-All three options can implement the Subject-first UX and Chat-first interaction, because these requirements are primarily UI-level concerns (routing, state management, and component composition) rather than framework-specific constraints. The key differentiator for this project is the asynchronous video workflow requirement, which benefits from a clear, documentation-backed way to implement request handlers for job submission and status checking. Next.js explicitly documents Route Handlers for creating custom request handlers using Web Request and Response APIs within the app directory. SvelteKit explicitly documents API routes via +server.js with HTTP method handlers. By contrast, the cited Vite documentation focuses on development assumptions and build targets rather than documenting an API-route mechanism on the same page.
+All three options can implement the Subject-first UX and Chat-first interaction, because these requirements are primarily UI-level concerns (routing, state management, and component composition) rather than framework-specific constraints. For this project, the differentiator is a maintainable full-stack integration model for real-time chat and optional multimodal rendering. Next.js explicitly documents Route Handlers for creating custom request handlers using Web Request and Response APIs within the app directory. SvelteKit explicitly documents API routes via +server.js with HTTP method handlers. By contrast, the cited Vite documentation focuses on development assumptions and build targets rather than documenting an API-route mechanism on the same page.
 
-Based on these documented patterns, Next.js was selected. Its Route Handlers provide a clear mechanism for implementing the request/response endpoints required for the asynchronous video flow while keeping the frontend and related request handlers within a consistent application structure. Finally, the system keeps the frontend-to-backend interaction behind stable API contracts so that the UI framework can be replaced if required by institutional constraints.
+Based on these documented patterns, Next.js was selected. Its Route Handlers provide a clear mechanism for implementing the request/response endpoints required for the chat and optional real-time multimodal flow while keeping the frontend and related request handlers within a consistent application structure. Finally, the system keeps the frontend-to-backend interaction behind stable API contracts so that the UI framework can be replaced if required by institutional constraints.
 
 \section{Backend API}
 \subsection{Requirements}
-The backend provides the tutoring API and coordinates asynchronous media generation jobs (text response first, video later). The backend framework selection was guided by the following requirements:
+The backend provides the tutoring API, including subject-specific chat and retrieval-augmented response generation. In this architecture, optional multimodal speech/avatar delivery is handled in the browser layer rather than as backend media generation jobs. The backend framework selection was guided by the following requirements:
+
 
 \begin{enumerate}
     \item \textbf{API-first design and documentation}
     The backend should support building Web APIs and provide a clear, documentation-backed mechanism for API documentation.
-    \item \textbf{Asynchronous and long-running workload support}
-    The system should be suitable for an architecture where some outputs are generated asynchronously and returned later.
+    \item \textbf{Responsiveness and long-running workload support}
+    The framework should support responsive API handling and remain suitable for potentially long-running inference or retrieval operations.
     \item \textbf{Data validation}
     Request/response data handling should be explicit and reliable.
     \item \textbf{Institutional deployment fit}
@@ -248,23 +247,26 @@ The backend provides the tutoring API and coordinates asynchronous media generat
     The framework should support a maintainable structure for an academic project handover.
 \end{enumerate}
 
+
+
 \subsection{Backend Framework Options}
 
-The \textbf{FastAPI} documentation describes it as a modern, fast (high-performance), web framework for building APIs with Python based on standard Python type hints. \parencite{FastAPIHome:online} The FastAPI documentation also states that it provides automatic interactive API documentation and that it is based on OpenAPI, with Swagger UI and ReDoc included by default. \parencite{FastAPIFeaturesDocs:online} In addition, the FastAPI features documentation states that FastAPI is fully compatible with (and based on) Starlette and lists Starlette features available in FastAPI, including WebSocket support and in-process background tasks. \parencite{FastAPIFeaturesStarlette:online} For deployment, the FastAPI documentation states that FastAPI is an ASGI web framework and that running a FastAPI application on a remote server requires an ASGI server program such as Uvicorn. \parencite{FastAPIDeployASGI:online} FastAPI is released under the MIT License in its source repository license file. \parencite{FastAPILicense:online} These statements directly support the API-first requirement (explicit API focus and automatic docs), the validation requirement (type hints with the documented FastAPI approach), and the asynchronous workload requirement via documented ASGI deployment and Starlette-based features. A trade-off is that video generation still requires a separate job execution approach (e.g., external workers), because the framework itself is not the job queue.
+The \textbf{FastAPI} documentation describes it as a modern, fast (high-performance), web framework for building APIs with Python based on standard Python type hints. \parencite{FastAPIHome:online} The FastAPI documentation also states that it provides automatic interactive API documentation and that it is based on OpenAPI, with Swagger UI and ReDoc included by default. \parencite{FastAPIFeaturesDocs:online} In addition, the FastAPI features documentation states that FastAPI is fully compatible with (and based on) Starlette and lists Starlette features available in FastAPI, including WebSocket support and in-process background tasks. \parencite{FastAPIFeaturesStarlette:online} For deployment, the FastAPI documentation states that FastAPI is an ASGI web framework and that running a FastAPI application on a remote server requires an ASGI server program such as Uvicorn. \parencite{FastAPIDeployASGI:online} FastAPI is released under the MIT License in its source repository license file. \parencite{FastAPILicense:online} These statements directly support the API-first requirement (explicit API focus and automatic docs), the validation requirement (type hints with the documented FastAPI approach), and robust API serving for chat/RAG workloads via documented ASGI deployment and Starlette-based features.
+
 
 The \textbf{Django REST framework} documentation describes DRF as a powerful and flexible toolkit for building Web APIs. It also lists reasons to use it, including a Web browsable API and authentication policies. \parencite{DRFHome:online} Separately, the Django documentation describes the Django admin site as an automatic admin interface that reads metadata from models and notes that its recommended use is limited to an organisation’s internal management tool. \parencite{DjangoAdmin:online} Django is distributed under the 3-clause BSD license according to its official FAQ. \parencite{DjangoLicenseFAQ:online} DRF directly addresses the API-first requirement (explicit Web API toolkit) and provides a documented developer-facing browsing interface for API resources, which can support maintainability during development. Django’s documented admin interface can be beneficial for internal management tasks. A potential trade-off is that this option introduces a broader framework surface (Django + DRF), which may be heavier than an API-first framework for an academic MVP focused primarily on API endpoints.
 
 The \textbf{Flask} documentation describes Flask as a lightweight WSGI web application framework designed to make getting started quick and easy, with the ability to scale to complex applications. \parencite{FlaskDocs:online} Flask provides the BSD-3-Clause license text in its documentation. \parencite{FlaskLicense:online} Flask supports building web applications and can be used for API endpoints, but the cited documentation characterises it primarily as a lightweight WSGI framework rather than an API-focused framework with built-in OpenAPI documentation. Therefore, meeting the API-first documentation requirement would rely on additional components not described in the cited page.
 
 \subsection{Backend Selection Rationale}
-Based on the documented properties above, FastAPI was selected as the backend framework for the MVP. FastAPI explicitly positions itself as a framework for building APIs and provides OpenAPI-based automatic interactive documentation (Swagger UI and ReDoc), which directly supports the API-first requirement. \parencite{FastAPIHome:online,FastAPIFeaturesDocs:online} FastAPI is also documented as an ASGI web framework intended to run with an ASGI server such as Uvicorn, which fits an architecture where some operations are handled asynchronously and results are delivered later. \parencite{FastAPIDeployASGI:online} Django+DRF remains a strong alternative because DRF is explicitly documented as a Web API toolkit and provides a browsable API, while Django provides an automatic admin interface recommended for internal management tools. \parencite{DRFHome:online,DjangoAdmin:online} Flask is documented as a lightweight WSGI framework and is suitable for web applications, but the cited documentation does not describe built-in OpenAPI documentation, making it less aligned with the API documentation requirement in this project. \parencite{FlaskDocs:online}
+Based on the documented properties above, FastAPI was selected as the backend framework for the MVP. FastAPI explicitly positions itself as a framework for building APIs and provides OpenAPI-based automatic interactive documentation (Swagger UI and ReDoc), which directly supports the API-first requirement. \parencite{FastAPIHome:online,FastAPIFeaturesDocs:online} FastAPI is also documented as an ASGI web framework intended to run with an ASGI server such as Uvicorn, which fits an API architecture that must remain responsive during potentially long-running retrieval and inference operations. \parencite{FastAPIDeployASGI:online} Django+DRF remains a strong alternative because DRF is explicitly documented as a Web API toolkit and provides a browsable API, while Django provides an automatic admin interface recommended for internal management tools. \parencite{DRFHome:online,DjangoAdmin:online} Flask is documented as a lightweight WSGI framework and is suitable for web applications, but the cited documentation does not describe built-in OpenAPI documentation, making it less aligned with the API documentation requirement in this project. \parencite{FlaskDocs:online}
 
 \section{Infrastructure and MLOps Architecture}
 
 \subsection{Containerisation}
 
 \paragraph{Requirements.}
-In this project, each academic subject is packaged and deployed as a single container image, allowing it to run, update, and scale independently of the others. Containerisation therefore serves not only as a lightweight virtualisation layer but also as a key mechanism for reproducibility, portability, and maintainability of the system. The following requirements guided the choice and configuration of the container engine.
+In this project, the backend is packaged as a shared container image, while each academic subject is deployed as an independent service/deployment using subject-specific runtime configuration, allowing it to run, update, and scale independently of the others. Containerisation therefore serves not only as a lightweight virtualisation layer but also as a key mechanism for reproducibility, portability, and maintainability of the system. The following requirements guided the choice and configuration of the container engine.
 
 \begin{enumerate}
     \item \textbf{Performance and efficiency}  
@@ -274,7 +276,7 @@ In this project, each academic subject is packaged and deployed as a single cont
     Each container image must be reproducible from version-controlled build files and compatible across environments (local, CI, and production).
 
     \item \textbf{Independent deployment per subject}  
-    Every subject’s container must be built, released, and rolled back independently, without affecting others. This guarantees clear versioning, minimal downtime, and better fault isolation across the system.
+    Every subject service must be rolled out and managed independently, while reusing the shared backend image, without affecting others. This guarantees clear versioning, minimal downtime, and better fault isolation across the system.
 
 \end{enumerate}
 
@@ -330,7 +332,7 @@ Container orchestration in this project must provide a reliable, portable, and r
     The orchestrator must support essential container management capabilities, including automated scheduling, scaling, self-healing, and rolling updates or rollbacks. These functions are necessary to maintain continuous service availability for subject-specific workloads.
 
     \item \textbf{Portability and vendor neutrality}  
-    The orchestration layer should remain compatible across local GPU nodes and public clouds, preserving standard APIs and avoiding vendor lock-in. Workloads must be transferable between environments without modification of manifests or Helm charts.
+    The orchestration layer should remain compatible across local GPU nodes and public clouds, preserving standard APIs and avoiding vendor lock-in. Workloads should remain largely transferable between environments with minimal environment-specific manifest adjustments (for example ingress and storage settings).
 
     \item \textbf{GitOps compatibility and reproducible deployment}  
     The orchestrator must integrate seamlessly with GitOps tools such as Argo CD, ensuring that the live cluster state remains synchronized with version-controlled manifests. This enables reproducible, auditable, and declarative infrastructure management.
@@ -345,14 +347,14 @@ Container orchestration automates scheduling, scaling, and self-healing of long-
 
 \textbf{Amazon EKS} offers Kubernetes as a managed service on AWS that control planes are operated by AWS, while workloads run on EC2 nodes or on Fargate. This reduces day-2 admin for cluster lifecycle and control-plane resilience, while preserving Kubernetes APIs and portability of workload definitions (Helm/Manifests/Operators). EKS thus keeps the operational model and ecosystem of Kubernetes, but with cloud-provider management of masters; organizations trade some low-level control of control planes for reduced toil and faster time-to-operate \parencite{Kubernet98:online}.
 
-\textbf{AWS ECS} orchestrates containers with a simpler, AWS-opinionated model (tasks, services, cluster capacity via EC2 or serverless Fargate). It delivers autoscaling and high availability without exposing the full Kubernetes surface. ECS is tightly integrated with AWS and historically aligns to the Docker runtime; its strengths are streamlined operations on AWS and a gentler learning curve compared to “full” Kubernetes. The trade-offs are provider lock-in and less portability across clouds; certain constructs (e.g., DaemonSet-style per-node agents) are not available on Fargate \parencite{Kubernet98:online,RunConta17:online}.
+\textbf{AWS ECS} orchestrates containers with a simpler, AWS-opinionated model (tasks, services, cluster capacity via EC2 or serverless Fargate). It delivers autoscaling and high availability without exposing the full Kubernetes surface. ECS is tightly integrated with AWS and historically aligns to the Docker runtime; its strengths are streamlined operations on AWS and a gentler learning curve compared to full Kubernetes. The trade-offs are provider lock-in and less portability across clouds; certain constructs (e.g., DaemonSet-style per-node agents) are not available on Fargate \parencite{Kubernet98:online,RunConta17:online}.
 
 Both Kubernetes, Amazon EKS and AWS ECS fulfil the basic orchestration functions of scheduling, scaling, and self-healing. However, their design philosophies diverge in ways that directly affect the project’s requirements. ECS provides simplified, AWS-specific orchestration that is well suited for organisations fully embedded in the AWS ecosystem, but its limited portability and vendor lock-in make it less appropriate for hybrid academic environments. In contrast, Kubernetes offers a cloud-agnostic, open-source control plane that aligns closely with the project’s priorities of portability, reproducible GitOps delivery, and maintainability on both local GPU nodes and cloud infrastructure. EKS extends these advantages by reducing administrative overhead through managed control-plane operations while preserving the standard Kubernetes API and Argo CD workflows. Therefore, Kubernetes was selected as the orchestration baseline, with EKS as the managed option for AWS environments, as it best satisfies the project’s requirements for reliability, portability, GitOps integration, and operational simplicity.
 
 \section{Implications for the Project}
 
-This chapter consolidated the key technical decisions that form the foundation of the Agentic AI Tutor system. The model evaluation process identified Phi-4-mini-instruct as the most suitable base model, balancing reasoning accuracy, energy efficiency, and open-source accessibility within the hardware and ethical constraints of an academic environment. Among parameter-efficient fine-tuning techniques, LoRA was selected for its stability and memory efficiency on single-GPU (12 GB VRAM) setups. The supporting infrastructure was designed to ensure reproducibility, portability, and low operational complexity: Docker enables isolated deployment per subject, GitHub Actions and Argo CD provide automated and transparent CI/CD delivery, and Kubernetes/EKS orchestrates containerised workloads across local and cloud environments. 
+This chapter consolidated the key technical decisions that form the foundation of the Agentic AI Tutor system. The model evaluation process identified Phi-4-mini-instruct as the most suitable base model, balancing reasoning accuracy, energy efficiency, and open-source accessibility within the hardware and ethical constraints of an academic environment. Among parameter-efficient fine-tuning techniques, LoRA was selected for its stability and memory efficiency on single-GPU (12 GB VRAM) setups. The supporting infrastructure was designed to ensure reproducibility, portability, and low operational complexity: Docker enables isolated subject-specific service deployment using a shared backend image and per-service runtime configuration, GitHub Actions and Argo CD provide automated and transparent CI/CD delivery, and Kubernetes/EKS orchestrates containerised workloads across local and cloud environments. 
 
-Together, these components establish a sustainable and reproducible MLOps architecture tailored to small-scale educational research. Accessibility considerations such as subtitles, speech-based interaction, and inclusive UI design, further ensure that the system supports diverse learners. Overall, the chosen architecture achieves the project’s goals of efficiency, transparency, and scalability while remaining practical for academic deployment and future experimentation.
+Together, these components establish a sustainable and reproducible MLOps architecture tailored to small-scale educational research. Accessibility considerations such as optional browser-based speech synthesis, talking-head rendering, and inclusive UI design, further ensure that the system supports diverse learners. Overall, the chosen architecture achieves the project’s goals of efficiency, transparency, and scalability while remaining practical for academic deployment and future experimentation.
 
 In the next chapter, the focus moves from technical options to the overall methodology. It describes how the chosen technology are combined into a complete workflow for developing the Agentic AI Tutor.

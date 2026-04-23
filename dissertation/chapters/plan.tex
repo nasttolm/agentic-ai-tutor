@@ -570,6 +570,9 @@ The most important observation is that the adapted SLMs become competitive on se
     which is consistent with METEOR favouring closer word-level alignment and ordering relative to the single reference.
 \end{itemize}
 
+\paragraph{Runtime environment for latency measurements.}
+Fine-tuning and most offline experiments were performed in Google Colab (Tesla T4 GPU). Latency benchmarking was performed separately in a dedicated rented runtime environment and is therefore not directly comparable to Colab timings. The measured setup used a high-memory rented GPU instance (96\,GB VRAM).
+
 \paragraph{Efficiency metrics.}
 Figures \ref{fig:all-lat-mean}-\ref{fig:all-n-tok-mean} compare the runtime behaviour of the evaluated models across subjects for the metrics available under the deployment setup.
 
@@ -596,6 +599,7 @@ Figures \ref{fig:all-lat-mean}-\ref{fig:all-n-tok-mean} compare the runtime beha
     \label{fig:all-n-tok-mean}
 \end{figure}
 \FloatBarrier
+
 
 The latency plots show that the deployed LoRA-based SLM variants provide lower end-to-end response times than the measured external LLM baseline in this setup. Across all three subjects, LoRA typically achieves the lowest mean latency. The retrieval step only slightly increases runtime.
 
@@ -639,7 +643,7 @@ As shown in Figure \ref{fig:deployment}, the system consists of four main layers
 \begin{itemize}
     \item \textbf{Ingress layer.} An Ingress controller routes external HTTP requests to either the frontend service (path /) or to a subject-specific backend service (paths /api/fsd, /api/fcs, /api/dma). Each backend exposes the same inference endpoint (/api/chat). The Ingress path prefix selects which subject service receives the request.
     \item \textbf{Frontend.} A Next.js application that provides the chat interface. It communicates with the backend through the Ingress, sending requests to /api/chat with the selected subject included in the JSON body.
-    \item \textbf{Backend microservices.} Three FastAPI-based backend services are deployed from the same container image, with each service dedicated to a single subject. The subject-specific LoRA adapter is embedded in the container image, while retrieval data is stored in an external ChromaDB instance deployed separately inside the Kubernetes cluster. The SUBJECT environment variable selects which subject configuration is activated at runtime. Each backend container runs on a GPU-equipped node.
+    \item \textbf{Backend microservices.} Three FastAPI-based backend services are deployed from the same container image, with each service dedicated to a single subject. The subject-specific LoRA adapter is embedded in the container image, while retrieval data is stored in an external ChromaDB instance deployed separately inside the Kubernetes cluster. The SUBJECT environment variable selects which subject configuration is activated at runtime. Each backend service is configured for subject-specific runtime isolation. GPU scheduling is environment-dependent and not hard-enforced in the current Kubernetes manifests.
 \end{itemize}
 
 This separation improves fault isolation, since a failure in one subject-specific service does not directly interrupt the others. Each service can be restarted, updated, and scaled independently. In Kubernetes, each service is managed by its own Deployment, which maintains multiple underlying pod instances, automatically restarts failed replicas, and supports scaling up or down in response to demand. In addition, retrieval storage is externalised into a dedicated ChromaDB instance for each subject. For that reason the application layer remains stateless at runtime, which simplifies dynamic scaling. Because each subject has its own Deployment, database, and embedded LoRA adapter, the services can be scaled independently according to subject-specific traffic and resource requirements.
@@ -691,7 +695,7 @@ The frontend is a Next.js application (version 16) that provides a chat-based in
 The frontend supports microservices mode. Separate variables (NEXT\_PUBLIC\_FSD\_API\_URL, NEXT\_PUBLIC\_FCS\_API\_URL, NEXT\_PUBLIC\_DMA\_API\_URL) point to individual backend services. In Kubernetes, these URLs resolve via the Ingress controller (using per-subject path prefixes) or via internal service DNS names depending on the deployment configuration.
 
 \paragraph{User interface.}
-The interface is built with React 19 and Tailwind CSS. It provides subject selection tabs, a conversational chat panel, and source cards that display retrieved chunks with their similarity scores. The frontend uses Axios for API communication and supports both synchronous and streaming response modes.
+The interface is built with React 19 and Tailwind CSS. It provides subject selection tabs, a conversational chat panel, and source cards that display retrieved chunks with their similarity scores. The frontend uses Axios for API communication and currently uses synchronous chat requests (/api/chat) in the deployed UI. A streaming backend endpoint is available for future frontend integration.
 
 Figure \ref{fig:frontend-main} shows the main chat interface, including subject selection and a generated tutor response.
 \begin{figure}[h]
@@ -794,11 +798,11 @@ Figure \ref{fig:kubernetes-ui} shows the Kubernetes resources as visualised in D
 Each subject (FSD, FCS, DMA) has its own Kubernetes Deployment with the following configuration:
 
 \begin{itemize}
-    \item \textbf{Replicas:} 1 per subject in this deployment (each replica requires a dedicated GPU, so horizontal scaling is constrained by GPU availability).
-    \item \textbf{Resource requests:} 4\,Gi memory, 1 CPU, 1 GPU (nvidia.com/gpu).
-    \item \textbf{Resource limits:} 12\,Gi memory, 4 CPUs, 1 GPU.
-    \item \textbf{Node placement:} a nodeSelector targeting nodes with nvidia.com/gpu: "true" and a corresponding toleration ensure pods are scheduled only on GPU-equipped nodes.
-    \item \textbf{Health probes:} readiness probe on /health (initial delay 60\,s, period 10\,s), liveness probe on /health (initial delay 120\,s, period 30\,s). The longer liveness delay accounts for the time needed to load the quantised model and LoRA adapter into GPU memory.
+    \item \textbf{Replicas:} 1 per subject in this deployment (in the current manifests, replicas are set to 1 per subject, scaling policy can be adjusted per environment).
+    \item \textbf{Resource requests:} 4\,Gi memory, 1 CPU.
+    \item \textbf{Resource limits:} 12\,Gi memory, 4 CPUs.
+    \item \textbf{Node placement:} no dedicated GPU nodeSelector/toleration is enforced in the current manifests, scheduling remains environment-dependent.
+    \item \textbf{Health probes:} readiness probe on /health (initial delay 300\,s, period 10\,s), liveness probe on /health (initial delay 600\,s, period 30\,s). The longer liveness delay accounts for the time needed to load the quantised model and LoRA adapter into GPU memory.
     \item \textbf{Environment:} SUBJECT is set to the corresponding subject code. CHROMA\_HOST is set to the internal DNS name of the subject's ChromaDB service (e.g.\ fsd-chroma). CHROMA\_PORT is set to 8000. The backend pods carry no volume mounts and are stateless at runtime.
 \end{itemize}
 
@@ -820,7 +824,8 @@ An Ingress resource maps external HTTP paths to internal services:
 The manifests include annotations for both AWS ALB and NGINX Ingress controllers, making the configuration portable across cloud providers.
 
 \paragraph{Kustomize management.}
-All Kubernetes manifests are managed through a kustomization.yaml file that declares the full set of resources (namespace, storage, per-subject deployments and services, frontend deployment and service, and ingress). This allows the entire stack to be applied with a single kubectl apply k command and ensures that the deployed state matches the version-controlled manifests.
+All Kubernetes manifests are managed through a kustomization.yaml file that declares the full set of resources (namespace, storage, per-subject deployments and services, frontend deployment and service, and ingress). This allows the entire stack to be applied with a single kubectl apply -k k8s/ command and ensures that the deployed state matches the version-controlled manifests.
+
 
 \section{Monitoring and maintenance}
 \subsection{Operational logging}
@@ -843,7 +848,7 @@ Each retrieval call logs the subject, the number of chunks returned, and a short
 
 \subsection{CI/CD pipeline}
 
-A continuous integration and delivery pipeline was implemented using GitHub Actions and Argo CD. The GitHub Actions workflow is organised into four jobs: lint, build, playwright, and scan. The build job depends on lint, while the Trivy-based scan job depends on the successful completion of the image build. The playwright job runs separately as part of the same workflow to validate frontend behaviour through smoke tests.
+A continuous integration and delivery pipeline was implemented using GitHub Actions and Argo CD. The GitHub Actions workflow is organised into six jobs: lint, build, build-frontend, playwright, scan, and gitops-update. The backend and frontend build jobs depend on lint. The Trivy-based scan job depends on the backend build. Gitops-update depends on both build jobs. The playwright job runs separately as part of the same workflow to validate frontend behaviour through smoke tests.
 
 Figure \ref{fig:github-actions} illustrates the GitHub Actions workflow used in the project. The pipeline consists of multiple stages, including syntax validation, container image build and push, frontend testing, and vulnerability scanning, with dependencies between jobs explicitly defined.
 
@@ -855,12 +860,13 @@ Figure \ref{fig:github-actions} illustrates the GitHub Actions workflow used in 
 \end{figure}
 \FloatBarrier
 
-The lint job runs on a standard Ubuntu runner without a GPU. It first checks the Python syntax of all backend modules using py\_compile, covering both the main service (config.py, rag.py, inference.py, main.py, schemas.py, logging\_config.py, tts.py). It then validates the Kubernetes manifests for structural correctness using kubeconform. This job runs on every push and every pull request, providing fast feedback before a Docker image is built.
+The lint job runs on a standard Ubuntu runner without a GPU. It first checks the Python syntax of all backend modules using py\_compile, covering both the main service (config.py, rag.py, inference.py, main.py, schemas.py, logging\_config.py). It then validates the Kubernetes manifests for structural correctness using kubeconform. This job runs on every push and every pull request, providing fast feedback before a Docker image is built.
+
 
 \paragraph{Security scanning.}
 The lint job also includes two automated security checks. First, Bandit, a static analysis tool for Python, scans the backend source code for common security issues. Second, the frontend dependencies are checked with npm audit at high severity level, so the audit focuses on high and critical vulnerabilities in the dependency tree.
 
-The build job runs only on pushes to the main branch and only if the lint job succeeds. It checks out the repository including Git LFS objects (the LoRA adapter .safetensors files), authenticates to the GitHub Container Registry (ghcr.io), and builds and pushes the backend Docker image. Two tags are produced: a latest tag for the default branch and a commit-SHA tag (for example, ghcr.io/nasttolm/ai-tutor-backend:a3f1c2d) that uniquely identifies each build. Build-layer caching through the GitHub Actions cache is enabled to reduce image build time on repeated pushes.
+On pushes to the main branch, two dedicated jobs build and push images to GHCR: the build job for the backend image and the build-frontend job for the frontend image. For each image, a latest tag and a commit-SHA tag are produced (for example, ghcr.io/nasttolm/ai-tutor-backend:<sha> and ghcr.io/nasttolm/ai-tutor-frontend:<sha>) that uniquely identifies each build. Build-layer caching through the GitHub Actions cache is enabled to reduce image build time on repeated pushes.
 
 \paragraph{Container image scanning.}
 The scan job runs after the build job and checks the published Docker image for vulnerabilities using Trivy \parencite{trivy}. While Bandit analyses the source code, Trivy examines the built container image itself, including operating system packages, system libraries, and installed Python dependencies. The scan focuses on HIGH and CRITICAL severity issues. The results are exported in SARIF format and uploaded to the GitHub Security tab through the CodeQL upload action. This makes the vulnerabilities visible in the repository’s security dashboard, but it does not stop the pipeline because the scan uses exit-code: 0. This separation is useful because it covers different layers of risk: source-level problems can be identified early in the lint job, while supply-chain and base-image vulnerabilities are reported after the image has been built.
@@ -874,7 +880,7 @@ The Application manifest points Argo CD at the k8s/ directory of the repository 
 The end-to-end delivery flow works as follows:
 \begin{itemize}
     \item A developer pushes a commit to main; GitHub Actions builds and pushes a new image tagged with the commit SHA.
-    \item The Kubernetes manifests in k8s/ are updated to reference the new tag.
+    \item The gitops-update job automatically updates backend and frontend image tags in k8s/kustomization.yaml and commits the change to the repository.
     \item Argo CD detects the change during its next polling cycle and rolls out the updated Deployment to the cluster.
 \end{itemize}
 
