@@ -18,6 +18,7 @@ spec:
         app: ai-tutor
         component: frontend
     spec:
+      serviceAccountName: ai-tutor-sa
       containers:
         - name: frontend
           image: ghcr.io/nasttolm/ai-tutor-frontend:latest

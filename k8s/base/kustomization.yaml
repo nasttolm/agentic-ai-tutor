@@ -5,6 +5,7 @@ namespace: ai-tutor
 
 resources:
   - namespace.yaml
+  - serviceaccount.yaml
   - storage.yaml
   - fsd/deployment.yaml
   - fsd/service.yaml

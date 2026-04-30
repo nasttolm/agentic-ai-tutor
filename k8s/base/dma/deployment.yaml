@@ -18,6 +18,7 @@ spec:
         app: ai-tutor
         subject: dma
     spec:
+      serviceAccountName: ai-tutor-sa
       containers:
         - name: dma-service
           image: ghcr.io/nasttolm/ai-tutor-backend:latest
