@@ -84,7 +84,7 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.BACKEND_IMAGE_NAME }}
           tags: |
-            type=sha,prefix=
+            type=sha,prefix=,format=long
             type=raw,value=latest,enable={{is_default_branch}}
 
       - name: Build and push
@@ -155,7 +155,7 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.FRONTEND_IMAGE_NAME }}
           tags: |
-            type=sha,prefix=
+            type=sha,prefix=,format=long
             type=raw,value=latest,enable={{is_default_branch}}
 
       - name: Build and push frontend
