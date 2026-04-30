@@ -18,6 +18,8 @@ spec:
         app: ai-tutor
         subject: fsd
     spec:
+      imagePullSecrets:
+        - name: ghcr-secret
       containers:
         - name: fsd-service
           image: ghcr.io/nasttolm/ai-tutor-backend:latest

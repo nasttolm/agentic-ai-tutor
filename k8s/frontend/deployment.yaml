@@ -18,6 +18,8 @@ spec:
         app: ai-tutor
         component: frontend
     spec:
+      imagePullSecrets:
+        - name: ghcr-secret
       containers:
         - name: frontend
           image: ghcr.io/nasttolm/ai-tutor-frontend:latest

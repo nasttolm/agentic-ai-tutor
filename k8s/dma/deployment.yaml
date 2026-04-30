@@ -18,6 +18,8 @@ spec:
         app: ai-tutor
         subject: dma
     spec:
+      imagePullSecrets:
+        - name: ghcr-secret
       containers:
         - name: dma-service
           image: ghcr.io/nasttolm/ai-tutor-backend:latest
