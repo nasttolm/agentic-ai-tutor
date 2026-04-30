@@ -29,13 +29,12 @@ spec:
           ports:
             - containerPort: 3000
           env:
-            # In Kubernetes, frontend calls services by their DNS names
             - name: NEXT_PUBLIC_FSD_API_URL
-              value: "http://fsd-service.ai-tutor.svc.cluster.local"
+              value: "/api/fsd"
             - name: NEXT_PUBLIC_FCS_API_URL
-              value: "http://fcs-service.ai-tutor.svc.cluster.local"
+              value: "/api/fcs"
             - name: NEXT_PUBLIC_DMA_API_URL
-              value: "http://dma-service.ai-tutor.svc.cluster.local"
+              value: "/api/dma"
           resources:
             requests:
               memory: "256Mi"

@@ -167,6 +167,10 @@ jobs:
           labels: ${{ steps.meta-frontend.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          build-args: |
+            NEXT_PUBLIC_FSD_API_URL=/api/fsd
+            NEXT_PUBLIC_FCS_API_URL=/api/fcs
+            NEXT_PUBLIC_DMA_API_URL=/api/dma
 
   scan:
     name: Trivy image scan
