@@ -49,10 +49,9 @@ jobs:
       - name: Validate k8s manifests (dry-run)
         run: |
           curl -L https://github.com/yannh/kubeconform/releases/latest/download/kubeconform-linux-amd64.tar.gz | tar xz
+          kubectl kustomize k8s > /tmp/k8s-rendered.yaml
           ./kubeconform -strict -summary \
-            k8s/namespace.yaml k8s/storage.yaml \
-            k8s/fsd/deployment.yaml k8s/fcs/deployment.yaml k8s/dma/deployment.yaml \
-            k8s/ingress.yaml
+            /tmp/k8s-rendered.yaml
 
   build:
     name: Build and push image

@@ -1,0 +1,27 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: ai-tutor
+
+resources:
+  - namespace.yaml
+  - storage.yaml
+  - fsd/deployment.yaml
+  - fsd/service.yaml
+  - fsd/chroma-deployment.yaml
+  - fsd/chroma-service.yaml
+  - fcs/deployment.yaml
+  - fcs/service.yaml
+  - fcs/chroma-deployment.yaml
+  - fcs/chroma-service.yaml
+  - dma/deployment.yaml
+  - dma/service.yaml
+  - dma/chroma-deployment.yaml
+  - dma/chroma-service.yaml
+  - frontend/deployment.yaml
+  - frontend/service.yaml
+
+labels:
+  - pairs:
+      app: ai-tutor
+      managed-by: kustomize

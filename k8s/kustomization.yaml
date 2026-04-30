@@ -1,39 +1,15 @@
-# Kustomization file for AI Tutor Kubernetes deployment
-# Usage: kubectl apply -k k8s/
+# Root kustomization kept as AWS-compatible default for GitOps/Argo CD.
+# Usage:
+# - AWS/default: kubectl apply -k k8s/
+# - Local:       kubectl apply -k k8s/overlays/local
 
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
-namespace: ai-tutor
-
 resources:
-  - namespace.yaml
-  - storage.yaml
-  # Backend services
-  - fsd/deployment.yaml
-  - fsd/service.yaml
-  - fsd/chroma-deployment.yaml
-  - fsd/chroma-service.yaml
-  - fcs/deployment.yaml
-  - fcs/service.yaml
-  - fcs/chroma-deployment.yaml
-  - fcs/chroma-service.yaml
-  - dma/deployment.yaml
-  - dma/service.yaml
-  - dma/chroma-deployment.yaml
-  - dma/chroma-service.yaml
-  # Frontend
-  - frontend/deployment.yaml
-  - frontend/service.yaml
-  # Ingress
-  - ingress.yaml
+  - overlays/aws
 
-labels:
-  - pairs:
-      app: ai-tutor
-      managed-by: kustomize
-
-# Image customization (override in overlays)
+# Image customization used by CI gitops-update job.
 images:
   - name: ghcr.io/nasttolm/ai-tutor-backend
     newTag: 23672dd7edd128d5e811f5d73efb30cbd1627a41

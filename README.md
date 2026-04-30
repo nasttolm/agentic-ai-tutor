@@ -175,11 +175,25 @@ npm run dev -- --webpack
 
 ```bash
 minikube start --driver=docker --gpus=all --memory=8192
-kubectl apply -k k8s/
+kubectl apply -k k8s/overlays/local
 kubectl get pods -n ai-tutor
 ```
 
-See `k8s/` for full manifests.
+Overlay layout:
+
+- `k8s/base` - shared manifests
+- `k8s/overlays/aws` - AWS/ALB ingress variant
+- `k8s/overlays/local` - local Kubernetes variant
+
+Default `kubectl apply -k k8s/` keeps AWS-compatible behaviour for Argo CD/GitOps.
+
+For local access without cloud load balancer:
+
+```bash
+kubectl -n ai-tutor port-forward svc/frontend 3000:80
+```
+
+Open: `http://localhost:3000`
 
 Kubernetes runtime examples:
 
@@ -194,7 +208,7 @@ This repository includes Argo CD manifests:
 - `k8s/argo/project.yaml`
 - `k8s/argo/application.yaml`
 
-`Application` tracks `path: k8s` on `targetRevision: main` and syncs it to namespace `ai-tutor`.
+`Application` tracks `path: k8s` (AWS-compatible default overlay) on `targetRevision: main` and syncs it to namespace `ai-tutor`.
 
 ### Local (Docker Desktop Kubernetes)
 
@@ -227,7 +241,8 @@ Argo CD application view:
 ![Argo CD Application View](dissertation/figs/argo_cd.png)
 
 Note for local Docker Desktop:
-- `Ingress` may remain `Progressing` because AWS ALB annotations in `k8s/ingress.yaml` are cloud-specific.
+- `Ingress` may remain `Progressing` in AWS mode because ALB annotations are cloud-specific.
+- For local-only runs, prefer `kubectl apply -k k8s/overlays/local` and access via `port-forward`.
 - Core services and pods can still be healthy and running.
 
 ### Cloud (EKS) recommended flow
