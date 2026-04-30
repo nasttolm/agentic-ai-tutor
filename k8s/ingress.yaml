@@ -11,6 +11,7 @@ metadata:
     # alb.ingress.kubernetes.io/target-type: ip
     # For NGINX Ingress Controller (local/minikube)
     nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+    nginx.ingress.kubernetes.io/rewrite-target: /$2
 spec:
   ingressClassName: nginx
   rules:
@@ -25,23 +26,23 @@ spec:
                 name: frontend
                 port:
                   number: 80
-          # API routes to subject-specific services
-          - path: /api/fsd
-            pathType: Prefix
+          # API routes to subject-specific services (prefix stripped by rewrite-target)
+          - path: /api/fsd(/|$)(.*)
+            pathType: ImplementationSpecific
             backend:
               service:
                 name: fsd-service
                 port:
                   number: 80
-          - path: /api/fcs
-            pathType: Prefix
+          - path: /api/fcs(/|$)(.*)
+            pathType: ImplementationSpecific
             backend:
               service:
                 name: fcs-service
                 port:
                   number: 80
-          - path: /api/dma
-            pathType: Prefix
+          - path: /api/dma(/|$)(.*)
+            pathType: ImplementationSpecific
             backend:
               service:
                 name: dma-service
