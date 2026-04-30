@@ -36,6 +36,6 @@ labels:
 # Image customization (override in overlays)
 images:
   - name: ghcr.io/nasttolm/ai-tutor-backend
-    newTag: 8c4be276bfe4173d8b37703bb6daee6ccb8c8f6f
+    newTag: eaec42461ee18a7882ec0bfb05bbbe3df59ac800
   - name: ghcr.io/nasttolm/ai-tutor-frontend
-    newTag: 8c4be276bfe4173d8b37703bb6daee6ccb8c8f6f
+    newTag: eaec42461ee18a7882ec0bfb05bbbe3df59ac800
