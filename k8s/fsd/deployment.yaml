@@ -8,6 +8,8 @@ metadata:
     subject: fsd
 spec:
   replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: ai-tutor

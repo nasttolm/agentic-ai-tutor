@@ -8,6 +8,8 @@ metadata:
     component: frontend
 spec:
   replicas: 2
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: ai-tutor
