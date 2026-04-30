@@ -12,6 +12,6 @@ resources:
 # Image customization used by CI gitops-update job.
 images:
   - name: ghcr.io/nasttolm/ai-tutor-backend
-    newTag: 117baa7027a9fc21df33cbcb629ed03e4953fd27
+    newTag: 58cdebd2d43ba416d475bf198c6e98fa2694c70f
   - name: ghcr.io/nasttolm/ai-tutor-frontend
-    newTag: 117baa7027a9fc21df33cbcb629ed03e4953fd27
+    newTag: 58cdebd2d43ba416d475bf198c6e98fa2694c70f
